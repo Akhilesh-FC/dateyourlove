@@ -11,7 +11,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const apiRoutes = require('./routes/api');
 const webRoutes = require('./routes/web');
-app.use('/api', apiAuth, apiRoutes);
+app.use('/api', apiRoutes);
 app.use('/web', webRoutes);
 
 const server = http.createServer(app);

@@ -1,3 +1,5 @@
+const jwt = require('jsonwebtoken');
+
 module.exports = (req, res, next) => {
   const authHeader = req.headers.authorization || req.headers.Authorization;
   if (!authHeader || typeof authHeader !== 'string') {
@@ -10,13 +12,13 @@ module.exports = (req, res, next) => {
   }
 
   const token = matches[1];
-  if (!process.env.API_TOKEN) {
-    return res.status(500).json({ status: 500, message: 'API token not configured' });
-  }
+  const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-me';
 
-  if (token !== process.env.API_TOKEN) {
-    return res.status(401).json({ status: 401, message: 'Unauthorized' });
+  try {
+    const decoded = jwt.verify(token, jwtSecret);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ status: 401, message: 'Unauthorized', error: err.message });
   }
-
-  next();
 };
