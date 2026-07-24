@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/Api/userController');
-const optionsController = require('../controllers/Api/optionscontroller');
+const optionsController = require('../controllers/Api/optionsController');
 const upload = require('../middleware/upload');
 
 router.get('/', (req, res) => res.json({ ok: true, version: 'api-v1' }));
