@@ -135,6 +135,125 @@ exports.sendOtp = async (req, res) => {
 //   - mobile DB me nahi hai -> isi request ke profile fields se REGISTER
 //     (agar required fields missing hain to 400 with missingFields list)
 
+exports.registerUser = async (req, res) => {
+  try {
+    const {
+      mobile,
+      email,
+      first_name,
+      about,
+      dob,
+      gender,
+      interested_in,
+      height_cm,
+      looking_for,
+      more_about,
+      religion,
+      languages,
+      lifestyle_smoking,
+      lifestyle_drinking,
+      lifestyle_workout,
+      diet,
+      lat,
+      lng,
+      distance_preferred,
+      photos,
+    } = req.body;
+
+    if (!mobile || !MOBILE_REGEX.test(String(mobile))) {
+      return res.status(400).json({ status: 400, message: 'Valid mobile number required' });
+    }
+
+    const missingFields = [];
+    if (!email) missingFields.push('email');
+    if (!first_name) missingFields.push('first_name');
+    if (!dob) missingFields.push('dob');
+    if (!gender) missingFields.push('gender');
+    if (!interested_in) missingFields.push('interested_in');
+    if (!height_cm) missingFields.push('height_cm');
+    if (!looking_for) missingFields.push('looking_for');
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Missing required fields',
+        requiredFields: missingFields,
+      });
+    }
+
+    if (photos && (!Array.isArray(photos) || photos.length < 4 || photos.length > 6)) {
+      return res.status(400).json({ status: 400, message: 'Photos must be an array of 4 to 6 items' });
+    }
+
+    const [existingUser] = await db.query('SELECT id FROM users WHERE mobile = ? OR email = ?', [mobile, email]);
+    if (existingUser.length) {
+      return res.status(409).json({ status: 409, message: 'User already exists' });
+    }
+
+    const parsedInterestedIn = Array.isArray(interested_in) ? interested_in : [interested_in];
+    const parsedLanguages = Array.isArray(languages) ? languages : languages ? [languages] : [];
+
+    const [result] = await db.query(
+      `INSERT INTO users (
+        mobile, email, first_name, about, dob, gender, interested_in,
+        height_cm, looking_for, more_about, religion, languages,
+        lifestyle_smoking, lifestyle_drinking, lifestyle_workout, diet,
+        lat, lng, distance_preferred, is_otp_verified, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
+      [
+        mobile,
+        email,
+        first_name,
+        about || null,
+        dob,
+        gender,
+        JSON.stringify(parsedInterestedIn),
+        height_cm,
+        looking_for,
+        more_about || null,
+        religion || null,
+        JSON.stringify(parsedLanguages),
+        lifestyle_smoking || null,
+        lifestyle_drinking || null,
+        lifestyle_workout || null,
+        diet || null,
+        lat || null,
+        lng || null,
+        distance_preferred || null,
+      ]
+    );
+
+    const newUserId = result.insertId;
+
+    if (photos && Array.isArray(photos)) {
+      const photoQueries = photos.map((url, index) => [newUserId, url, index < 4 ? 1 : 0]);
+      await Promise.all(
+        photoQueries.map((params) =>
+          db.query('INSERT INTO user_photos (user_id, url, is_required, created_at) VALUES (?, ?, ?, NOW())', params)
+        )
+      );
+    }
+
+    const jwtSecret = getJwtSecret();
+    if (!jwtSecret) {
+      return res.status(500).json({ status: 500, message: 'JWT secret not configured' });
+    }
+
+    const token = jwt.sign({ id: newUserId, mobile }, jwtSecret, { expiresIn: '7d' });
+
+    return res.status(201).json({
+      status: 201,
+      message: 'Registration successful',
+      token,
+      userId: newUserId,
+      isRegistered: true,
+    });
+  } catch (err) {
+    console.error('REGISTER ERROR:', err.message);
+    return res.status(500).json({ status: 500, message: 'Registration failed', error: err.message });
+  }
+};
+
 exports.verifyOtp = async (req, res) => {
   try {
     const {
@@ -236,9 +355,10 @@ exports.verifyOtp = async (req, res) => {
     if (!looking_for) missingFields.push('looking_for');
 
     if (missingFields.length > 0) {
-      return res.status(400).json({
-        status: 400,
-        message: 'New number. Send these fields along with mobile & otp to register.',
+      return res.status(200).json({
+        status: 200,
+        message: 'User not found',
+        action: 'register',
         isRegistered: false,
         requiredFields: missingFields,
       });

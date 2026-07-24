@@ -12,4 +12,7 @@ router.post('/otp/send', userController.sendOtp);
 //    -> match ho gaya + DB me nahi hai     => isi request ke data se REGISTER
 router.post('/otp/verify', userController.verifyOtp);
 
+// 3) dedicated registration endpoint for new users
+router.post('/register', userController.registerUser);
+
 module.exports = router;
