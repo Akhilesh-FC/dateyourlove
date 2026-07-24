@@ -4,6 +4,7 @@ const db = require('../../config/db');
 
 const MOBILE_REGEX = /^[0-9]{10}$/;
 const otpStore = new Map();
+const getJwtSecret = () => process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? null : 'dev-secret-change-me');
 
 // ---------- helpers ----------
 
@@ -208,7 +209,11 @@ exports.verifyOtp = async (req, res) => {
     // ---------- MOBILE MATCHED -> LOGIN ----------
     if (rows.length > 0) {
       const user = rows[0];
-      const token = jwt.sign({ id: user.id, mobile }, process.env.JWT_SECRET, { expiresIn: '7d' });
+      const jwtSecret = getJwtSecret();
+      if (!jwtSecret) {
+        return res.status(500).json({ status: 500, message: 'JWT secret not configured' });
+      }
+      const token = jwt.sign({ id: user.id, mobile }, jwtSecret, { expiresIn: '7d' });
 
       return res.status(200).json({
         status: 200,
@@ -292,7 +297,11 @@ exports.verifyOtp = async (req, res) => {
       );
     }
 
-    const token = jwt.sign({ id: newUserId, mobile }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const jwtSecret = getJwtSecret();
+    if (!jwtSecret) {
+      return res.status(500).json({ status: 500, message: 'JWT secret not configured' });
+    }
+    const token = jwt.sign({ id: newUserId, mobile }, jwtSecret, { expiresIn: '7d' });
 
     return res.status(200).json({
       status: 200,
