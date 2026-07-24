@@ -1,0 +1,39 @@
+name: Deploy to Plesk
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify app entrypoint
+        run: node -e "const pkg = require('./package.json'); if (!pkg.scripts || !pkg.scripts.start) throw new Error('Missing start script'); console.log('Start script is ready');"
+
+      - name: Deploy to Plesk via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PLESK_HOST }}
+          username: ${{ secrets.PLESK_USERNAME }}
+          key: ${{ secrets.PLESK_SSH_KEY }}
+          port: ${{ secrets.PLESK_PORT || 22 }}
+          script: |
+            cd /path/to/your/app
+            git pull origin main
+            npm ci --omit=dev
+            bash ./scripts/deploy-plesk.sh

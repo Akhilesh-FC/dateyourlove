@@ -1,0 +1,61 @@
+-- Create database and tables for demo
+CREATE DATABASE IF NOT EXISTS dateyourlove;
+USE dateyourlove;
+
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  mobile VARCHAR(20) NOT NULL,
+  email VARCHAR(255) DEFAULT NULL,
+  first_name VARCHAR(100) DEFAULT NULL,
+  about TEXT DEFAULT NULL,
+  dob DATE DEFAULT NULL,
+  gender VARCHAR(32) DEFAULT NULL,
+  interested_in JSON DEFAULT NULL,
+  height_cm INT DEFAULT NULL,
+  looking_for VARCHAR(255) DEFAULT NULL,
+  more_about TEXT DEFAULT NULL,
+  religion VARCHAR(100) DEFAULT NULL,
+  languages JSON DEFAULT NULL,
+  lifestyle_smoking VARCHAR(50) DEFAULT NULL,
+  lifestyle_drinking VARCHAR(50) DEFAULT NULL,
+  lifestyle_workout VARCHAR(50) DEFAULT NULL,
+  diet VARCHAR(50) DEFAULT NULL,
+  lat DECIMAL(10, 7) DEFAULT NULL,
+  lng DECIMAL(10, 7) DEFAULT NULL,
+  distance_preferred INT DEFAULT NULL,
+  otp VARCHAR(10) DEFAULT NULL,
+  otp_expire_at DATETIME DEFAULT NULL,
+  is_otp_verified TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_email (email),
+  INDEX idx_mobile (mobile)
+);
+
+CREATE TABLE IF NOT EXISTS user_photos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  url VARCHAR(1000) NOT NULL,
+  is_required TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX(user_id)
+);
+
+CREATE TABLE IF NOT EXISTS likes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  from_user INT NOT NULL,
+  to_user INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX(from_user),
+  INDEX(to_user)
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  from_user INT NOT NULL,
+  to_user INT NOT NULL,
+  text TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX(from_user),
+  INDEX(to_user)
+);
