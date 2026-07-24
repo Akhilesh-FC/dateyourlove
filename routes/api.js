@@ -13,7 +13,11 @@ router.post('/otp/verify', userController.verifyOtp); // JSON body, photos as UR
 // form-data: text fields + up to 6 files under the "photos" field
 router.post('/register', upload.array('photos', 6), userController.registerUser);
 
-// ---------- DROPDOWN / OPTIONS - har list ki apni alag api ----------
+// ---------- DROPDOWN / OPTIONS ----------
+// Sabhi lists ek hi call me (har list apni alag key ke niche)
+router.get('/options', optionsController.getAllOptions);
+
+// alag-alag bhi available hain (jaisa pehle tha, chahiye to use karo)
 router.get('/options/looking-for', optionsController.getLookingForOptions);
 router.get('/options/religions', optionsController.getReligionOptions);
 router.get('/options/languages', optionsController.getLanguageOptions);
