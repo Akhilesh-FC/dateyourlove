@@ -11,7 +11,7 @@ router.get('/', (req, res) => res.json({ ok: true, version: 'api-v1' }));
 // ---------- AUTH / REGISTRATION ----------
 router.post('/otp/send', userController.sendOtp);
 router.post('/otp/verify', userController.verifyOtp);
-router.post('/register', upload.array('photos', 6), userController.registerUser);
+router.post('/register', upload.array('photos', 10), userController.registerUser);
 
 // ---------- DROPDOWN / OPTIONS ----------
 router.get('/options', optionsController.getAllOptions);

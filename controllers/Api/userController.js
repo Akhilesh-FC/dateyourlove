@@ -10,6 +10,9 @@ const getJwtSecret = () => process.env.JWT_SECRET || (process.env.NODE_ENV === '
 
 const safeParseJson = (value, fallback) => {
   if (!value) return fallback;
+  // Agar column JSON type ka hai to mysql2 pehle se hi array/object de deta hai
+  // (server par yahi ho raha tha) - aise me JSON.parse crash kar deta hai.
+  if (Array.isArray(value) || typeof value === 'object') return value;
   try {
     return JSON.parse(value);
   } catch (err) {
@@ -203,8 +206,8 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    if (uploadedFiles.length < 4 || uploadedFiles.length > 6) {
-      return res.status(400).json({ message: 'Upload 4 to 6 photos' });
+    if (uploadedFiles.length < 4) {
+      return res.status(400).json({ message: 'Upload at least 4 photos' });
     }
 
     const [existingUser] = await db.query('SELECT id FROM users WHERE mobile = ? OR email = ?', [mobile, email]);
@@ -278,7 +281,35 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-// ---------- 3) VERIFY OTP + LOGIN / REGISTER (single call) ----------
+// ---------- 4) GET PROFILE (protected - needs Authorization: Bearer <token>) ----------
+// Token authMiddleware se verify hokar req.user = { id, mobile } set karta hai.
+// Yahan sirf token ke userId ki profile milegi - koi userId body/query me
+// bhejne ki zarurat nahi (aur bhej bhi de to use nahi kiya jayega).
+
+exports.getProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [rows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (!rows.length) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const [photoRows] = await db.query(
+      'SELECT url FROM user_photos WHERE user_id = ? ORDER BY is_required DESC, id ASC',
+      [userId]
+    );
+
+    const profile = buildUserPayload(rows[0]);
+    profile.photos = photoRows.map((p) => p.url);
+
+    return res.status(200).json({ user: profile });
+  } catch (err) {
+    console.error('GET PROFILE ERROR:', err.message);
+    return res.status(500).json({ message: 'Unable to fetch profile' });
+  }
+};
+
 // mobile + otp -> OTP provider se verify hota hai.
 //   - mobile already DB me hai -> LOGIN (baaki fields ignore, agar bheje bhi ho)
 //   - mobile DB me nahi hai -> isi request ke profile fields se REGISTER
@@ -391,8 +422,8 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
-    if (photos && (!Array.isArray(photos) || photos.length < 4 || photos.length > 6)) {
-      return res.status(400).json({ message: 'Photos must be an array of 4 to 6 items' });
+    if (photos && (!Array.isArray(photos) || photos.length < 4)) {
+      return res.status(400).json({ message: 'Photos must be at least 4 items' });
     }
 
     const [existingEmail] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
@@ -462,35 +493,3 @@ exports.verifyOtp = async (req, res) => {
     return res.status(500).json({ message: 'OTP verification failed', error: err.message });
   }
 };
-
-
-
-// ---------- 4) GET PROFILE (protected - needs Authorization: Bearer <token>) ----------
-// Token authMiddleware se verify hokar req.user = { id, mobile } set karta hai.
-// Yahan sirf token ke userId ki profile milegi - koi userId body/query me
-// bhejne ki zarurat nahi (aur bhej bhi de to use nahi kiya jayega).
- 
-exports.getProfile = async (req, res) => {
-  try {
-    const userId = req.user.id;
- 
-    const [rows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
-    if (!rows.length) {
-      return res.status(404).json({ message: 'User not found' });
-    }
- 
-    const [photoRows] = await db.query(
-      'SELECT url FROM user_photos WHERE user_id = ? ORDER BY is_required DESC, id ASC',
-      [userId]
-    );
- 
-    const profile = buildUserPayload(rows[0]);
-    profile.photos = photoRows.map((p) => p.url);
- 
-    return res.status(200).json({ user: profile });
-  } catch (err) {
-    console.error('GET PROFILE ERROR:', err.message);
-    return res.status(500).json({ message: 'Unable to fetch profile' });
-  }
-};
- 
