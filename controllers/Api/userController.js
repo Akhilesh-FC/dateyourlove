@@ -128,7 +128,32 @@ exports.sendOtp = async (req, res) => {
   }
 };
 
-// ---------- 2) DEDICATED REGISTER ENDPOINT ----------
+// ---------- 2) DEDICATED REGISTER ENDPOINT (multipart/form-data) ----------
+// Text fields aate hain req.body me (strings).
+// Images aati hain req.files me (multer 'photos' field se, upload.array('photos', 6)).
+// interested_in / languages ko form-data me array ki tarah bhejna ho to:
+//   - same key "interested_in" ko 2-3 baar add karo (Postman form-data me),
+//   - YA ek hi field me comma-separated string bhejo: "male,female"
+//   - YA ek hi field me JSON string bhejo: '["male","female"]'
+// teeno tareeke yahan handle ho jate hain.
+
+const parseArrayField = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) ? parsed : [trimmed];
+      } catch (err) {
+        // fall through to comma split
+      }
+    }
+    return trimmed.split(',').map((v) => v.trim()).filter(Boolean);
+  }
+  return [value];
+};
 
 exports.registerUser = async (req, res) => {
   try {
@@ -152,8 +177,9 @@ exports.registerUser = async (req, res) => {
       lat,
       lng,
       distance_preferred,
-      photos,
     } = req.body;
+
+    const uploadedFiles = req.files || [];
 
     if (!mobile || !MOBILE_REGEX.test(String(mobile))) {
       return res.status(400).json({ message: 'Valid mobile number required' });
@@ -175,8 +201,8 @@ exports.registerUser = async (req, res) => {
       });
     }
 
-    if (photos && (!Array.isArray(photos) || photos.length < 4 || photos.length > 6)) {
-      return res.status(400).json({ message: 'Photos must be an array of 4 to 6 items' });
+    if (uploadedFiles.length < 4 || uploadedFiles.length > 6) {
+      return res.status(400).json({ message: 'Upload 4 to 6 photos' });
     }
 
     const [existingUser] = await db.query('SELECT id FROM users WHERE mobile = ? OR email = ?', [mobile, email]);
@@ -184,8 +210,9 @@ exports.registerUser = async (req, res) => {
       return res.status(409).json({ message: 'User already exists' });
     }
 
-    const parsedInterestedIn = Array.isArray(interested_in) ? interested_in : [interested_in];
-    const parsedLanguages = Array.isArray(languages) ? languages : languages ? [languages] : [];
+    const parsedInterestedIn = parseArrayField(interested_in);
+    const parsedLanguages = parseArrayField(languages);
+    const photos = uploadedFiles.map((file) => `/uploads/photos/${file.filename}`);
 
     const [result] = await db.query(
       `INSERT INTO users (
@@ -240,6 +267,7 @@ exports.registerUser = async (req, res) => {
       token,
       userId: newUserId,
       isRegistered: true,
+      photos,
     });
   } catch (err) {
     console.error('REGISTER ERROR:', err.message);
