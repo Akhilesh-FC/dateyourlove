@@ -3,6 +3,8 @@ const router = express.Router();
 const userController = require('../controllers/Api/userController');
 const optionsController = require('../controllers/Api/optionsController');
 const upload = require('../middleware/upload');
+const settingsController = require('../controllers/Api/settingsController');
+
 
 router.get('/', (req, res) => res.json({ ok: true, version: 'api-v1' }));
 
@@ -29,5 +31,10 @@ router.get('/options/diet', optionsController.getDietOptions);
 // ---------- PROTECTED (add here once you build them) ----------
 // router.get('/profile/me', authMiddleware, userController.getMyProfile);
 // router.post('/matches', authMiddleware, userController.getMatches);
+
+
+// ---------- SETTINGS (child policy, privacy, terms, refund - ek hi table/api) ----------
+router.get('/setting', settingsController.getSettings);
+router.post('/setting', settingsController.upsertSetting); // TODO: admin-auth se protect karo
 
 module.exports = router;
