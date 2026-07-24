@@ -4,9 +4,9 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 
-const apiAuth = require('./middleware/apiAuth');
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // supports x-www-form-urlencoded bodies too
 app.use(express.static(path.join(__dirname, 'public')));
 
 const apiRoutes = require('./routes/api');

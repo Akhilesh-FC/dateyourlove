@@ -93,54 +93,18 @@ const requestOtpProvider = (url) => new Promise((resolve, reject) => {
 
 // ---------- 1) SEND OTP ----------
 
-// exports.sendOtp = async (req, res) => {
-//   try {
-//     const { mobile } = req.body;
-//     if (!mobile || !MOBILE_REGEX.test(String(mobile))) {
-//       return res.status(400).json({ status: 400, message: 'Valid mobile number required' });
-//     }
-
-//     const merchantKey = process.env.API_MERCHANT_KEY;
-//     if (!merchantKey && !isMockOtpEnabled()) {
-//       throw new Error('API_MERCHANT_KEY not configured');
-//     }
-
-//     if (isMockOtpEnabled()) {
-//       const otp = generateOtpCode();
-//       saveMockOtp(mobile, otp);
-//       console.log(`Mock OTP for ${mobile}: ${otp}`);
-//       return res.status(200).json({
-//         status: 200,
-//         message: 'OTP sent successfully (mock mode)',
-//         otp: process.env.NODE_ENV !== 'production' ? otp : undefined,
-//       });
-//     }
-
-//     const url = `https://indopay.cloud/otp/newsend_otp.php?merchant_key=${merchantKey}&mobile_no=${mobile}&digit=4`;
-//     const response = await requestOtpProvider(url);
-//     if (!response.ok) {
-//       throw new Error(`OTP provider returned status ${response.status}: ${response.raw || 'No response body'}`);
-//     }
-
-//     return res.status(200).json({ status: 200, message: 'OTP sent successfully' });
-//   } catch (err) {
-//     console.error('SEND OTP ERROR:', err.message);
-//     return res.status(500).json({ status: 500, message: err.message });
-//   }
-// };
-
 exports.sendOtp = async (req, res) => {
   try {
     const { mobile } = req.body;
     if (!mobile || !MOBILE_REGEX.test(String(mobile))) {
-      return res.status(400).json({ status: 400, message: 'Valid mobile number required' });
+      return res.status(400).json({ message: 'Valid mobile number required' });
     }
- 
+
     const merchantKey = process.env.API_MERCHANT_KEY;
     if (!merchantKey && !isMockOtpEnabled()) {
       throw new Error('API_MERCHANT_KEY not configured');
     }
- 
+
     if (isMockOtpEnabled()) {
       const otp = generateOtpCode();
       saveMockOtp(mobile, otp);
@@ -150,24 +114,21 @@ exports.sendOtp = async (req, res) => {
         otp: process.env.NODE_ENV !== 'production' ? otp : undefined,
       });
     }
- 
+
     const url = `https://indopay.cloud/otp/newsend_otp.php?merchant_key=${merchantKey}&mobile_no=${mobile}&digit=4`;
     const response = await requestOtpProvider(url);
     if (!response.ok) {
       throw new Error(`OTP provider returned status ${response.status}: ${response.raw || 'No response body'}`);
     }
- 
+
     return res.status(200).json({ message: 'OTP sent successfully' });
   } catch (err) {
     console.error('SEND OTP ERROR:', err.message);
-    return res.status(500).json({ status: 500, message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };
-// ---------- 2) VERIFY OTP + LOGIN / REGISTER (single call) ----------
-// mobile + otp -> OTP provider se verify hota hai.
-//   - mobile already DB me hai -> LOGIN (baaki fields ignore, agar bheje bhi ho)
-//   - mobile DB me nahi hai -> isi request ke profile fields se REGISTER
-//     (agar required fields missing hain to 400 with missingFields list)
+
+// ---------- 2) DEDICATED REGISTER ENDPOINT ----------
 
 exports.registerUser = async (req, res) => {
   try {
@@ -195,7 +156,7 @@ exports.registerUser = async (req, res) => {
     } = req.body;
 
     if (!mobile || !MOBILE_REGEX.test(String(mobile))) {
-      return res.status(400).json({ status: 400, message: 'Valid mobile number required' });
+      return res.status(400).json({ message: 'Valid mobile number required' });
     }
 
     const missingFields = [];
@@ -209,19 +170,18 @@ exports.registerUser = async (req, res) => {
 
     if (missingFields.length > 0) {
       return res.status(400).json({
-        status: 400,
         message: 'Missing required fields',
         requiredFields: missingFields,
       });
     }
 
     if (photos && (!Array.isArray(photos) || photos.length < 4 || photos.length > 6)) {
-      return res.status(400).json({ status: 400, message: 'Photos must be an array of 4 to 6 items' });
+      return res.status(400).json({ message: 'Photos must be an array of 4 to 6 items' });
     }
 
     const [existingUser] = await db.query('SELECT id FROM users WHERE mobile = ? OR email = ?', [mobile, email]);
     if (existingUser.length) {
-      return res.status(409).json({ status: 409, message: 'User already exists' });
+      return res.status(409).json({ message: 'User already exists' });
     }
 
     const parsedInterestedIn = Array.isArray(interested_in) ? interested_in : [interested_in];
@@ -270,13 +230,12 @@ exports.registerUser = async (req, res) => {
 
     const jwtSecret = getJwtSecret();
     if (!jwtSecret) {
-      return res.status(500).json({ status: 500, message: 'JWT secret not configured' });
+      return res.status(500).json({ message: 'JWT secret not configured' });
     }
 
     const token = jwt.sign({ id: newUserId, mobile }, jwtSecret, { expiresIn: '7d' });
 
     return res.status(201).json({
-      status: 201,
       message: 'Registration successful',
       token,
       userId: newUserId,
@@ -284,9 +243,15 @@ exports.registerUser = async (req, res) => {
     });
   } catch (err) {
     console.error('REGISTER ERROR:', err.message);
-    return res.status(500).json({ status: 500, message: 'Registration failed', error: err.message });
+    return res.status(500).json({ message: 'Registration failed', error: err.message });
   }
 };
+
+// ---------- 3) VERIFY OTP + LOGIN / REGISTER (single call) ----------
+// mobile + otp -> OTP provider se verify hota hai.
+//   - mobile already DB me hai -> LOGIN (baaki fields ignore, agar bheje bhi ho)
+//   - mobile DB me nahi hai -> isi request ke profile fields se REGISTER
+//     (agar required fields missing hain to 400 with missingFields list)
 
 exports.verifyOtp = async (req, res) => {
   try {
@@ -312,13 +277,14 @@ exports.verifyOtp = async (req, res) => {
       lng,
       distance_preferred,
       photos,
+      fcm_token,
     } = req.body;
 
     if (!mobile || !otp) {
-      return res.status(400).json({ status: 400, message: 'Mobile & OTP required' });
+      return res.status(400).json({ message: 'Mobile & OTP required' });
     }
     if (!MOBILE_REGEX.test(String(mobile))) {
-      return res.status(400).json({ status: 400, message: 'Invalid mobile number' });
+      return res.status(400).json({ message: 'Invalid mobile number' });
     }
 
     const merchantKey = process.env.API_MERCHANT_KEY;
@@ -331,7 +297,7 @@ exports.verifyOtp = async (req, res) => {
       if (storedOtp && String(storedOtp.otp) === String(otp)) {
         otpStore.delete(String(mobile));
       } else {
-        return res.status(400).json({ status: 400, message: 'Invalid OTP' });
+        return res.status(400).json({ message: 'Invalid OTP' });
       }
     } else {
       const verifyUrl = `https://indopay.cloud/otp/verifyotp.php?merchant_key=${merchantKey}&mobile=${mobile}&otp=${otp}`;
@@ -351,11 +317,9 @@ exports.verifyOtp = async (req, res) => {
         (typeof data?.msg === 'string' && data.msg.includes('Successfully'));
 
       if (!otpSuccess) {
-        return res.status(400).json({ status: 400, message: 'Invalid OTP', raw: data });
+        return res.status(400).json({ message: 'Invalid OTP', raw: data });
       }
     }
-
-    const data = { status: 'success' };
 
     const [rows] = await db.query('SELECT * FROM users WHERE mobile = ?', [mobile]);
 
@@ -364,12 +328,11 @@ exports.verifyOtp = async (req, res) => {
       const user = rows[0];
       const jwtSecret = getJwtSecret();
       if (!jwtSecret) {
-        return res.status(500).json({ status: 500, message: 'JWT secret not configured' });
+        return res.status(500).json({ message: 'JWT secret not configured' });
       }
       const token = jwt.sign({ id: user.id, mobile }, jwtSecret, { expiresIn: '7d' });
 
       return res.status(200).json({
-        status: 200,
         message: 'Login successful',
         token,
         userId: user.id,
@@ -390,7 +353,6 @@ exports.verifyOtp = async (req, res) => {
 
     if (missingFields.length > 0) {
       return res.status(200).json({
-        status: 200,
         message: 'User not found',
         action: 'register',
         isRegistered: false,
@@ -399,24 +361,26 @@ exports.verifyOtp = async (req, res) => {
     }
 
     if (photos && (!Array.isArray(photos) || photos.length < 4 || photos.length > 6)) {
-      return res.status(400).json({ status: 400, message: 'Photos must be an array of 4 to 6 items' });
+      return res.status(400).json({ message: 'Photos must be an array of 4 to 6 items' });
     }
 
     const [existingEmail] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existingEmail.length) {
-      return res.status(400).json({ status: 400, message: 'Email already in use' });
+      return res.status(400).json({ message: 'Email already in use' });
     }
 
     const parsedInterestedIn = Array.isArray(interested_in) ? interested_in : [interested_in];
     const parsedLanguages = Array.isArray(languages) ? languages : languages ? [languages] : [];
 
+    // NOTE: column list ke end me trailing comma thi (`...updated_at,\n)`)
+    // jo invalid SQL hai - fixed.
     const [result] = await db.query(
       `INSERT INTO users (
         mobile, email, first_name, about, dob, gender, interested_in,
         height_cm, looking_for, more_about, religion, languages,
         lifestyle_smoking, lifestyle_drinking, lifestyle_workout, diet,
-        lat, lng, distance_preferred, is_otp_verified, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
+        lat, lng, distance_preferred, fcm_token, is_otp_verified, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
       [
         mobile,
         email,
@@ -437,6 +401,7 @@ exports.verifyOtp = async (req, res) => {
         lat || null,
         lng || null,
         distance_preferred || null,
+        fcm_token || null,
       ]
     );
 
@@ -453,12 +418,11 @@ exports.verifyOtp = async (req, res) => {
 
     const jwtSecret = getJwtSecret();
     if (!jwtSecret) {
-      return res.status(500).json({ status: 500, message: 'JWT secret not configured' });
+      return res.status(500).json({ message: 'JWT secret not configured' });
     }
     const token = jwt.sign({ id: newUserId, mobile }, jwtSecret, { expiresIn: '7d' });
 
     return res.status(200).json({
-      status: 200,
       message: 'Registration successful',
       token,
       userId: newUserId,
@@ -466,6 +430,6 @@ exports.verifyOtp = async (req, res) => {
     });
   } catch (err) {
     console.error('VERIFY OTP ERROR:', err.message);
-    return res.status(500).json({ status: 500, message: 'OTP verification failed', error: err.message });
+    return res.status(500).json({ message: 'OTP verification failed', error: err.message });
   }
 };
