@@ -462,3 +462,35 @@ exports.verifyOtp = async (req, res) => {
     return res.status(500).json({ message: 'OTP verification failed', error: err.message });
   }
 };
+
+
+
+// ---------- 4) GET PROFILE (protected - needs Authorization: Bearer <token>) ----------
+// Token authMiddleware se verify hokar req.user = { id, mobile } set karta hai.
+// Yahan sirf token ke userId ki profile milegi - koi userId body/query me
+// bhejne ki zarurat nahi (aur bhej bhi de to use nahi kiya jayega).
+ 
+exports.getProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+ 
+    const [rows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (!rows.length) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+ 
+    const [photoRows] = await db.query(
+      'SELECT url FROM user_photos WHERE user_id = ? ORDER BY is_required DESC, id ASC',
+      [userId]
+    );
+ 
+    const profile = buildUserPayload(rows[0]);
+    profile.photos = photoRows.map((p) => p.url);
+ 
+    return res.status(200).json({ user: profile });
+  } catch (err) {
+    console.error('GET PROFILE ERROR:', err.message);
+    return res.status(500).json({ message: 'Unable to fetch profile' });
+  }
+};
+ 
