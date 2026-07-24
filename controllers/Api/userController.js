@@ -177,6 +177,7 @@ exports.registerUser = async (req, res) => {
       lat,
       lng,
       distance_preferred,
+      fcm_token,
     } = req.body;
 
     const uploadedFiles = req.files || [];
@@ -219,8 +220,8 @@ exports.registerUser = async (req, res) => {
         mobile, email, first_name, about, dob, gender, interested_in,
         height_cm, looking_for, more_about, religion, languages,
         lifestyle_smoking, lifestyle_drinking, lifestyle_workout, diet,
-        lat, lng, distance_preferred, is_otp_verified, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
+        lat, lng, distance_preferred,fcm_token, is_otp_verified, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, 1, NOW(), NOW())`,
       [
         mobile,
         email,
@@ -241,6 +242,7 @@ exports.registerUser = async (req, res) => {
         lat || null,
         lng || null,
         distance_preferred || null,
+        fcm_token,
       ]
     );
 
