@@ -194,6 +194,7 @@ exports.registerUser = async (req, res) => {
     if (!interested_in) missingFields.push('interested_in');
     if (!height_cm) missingFields.push('height_cm');
     if (!looking_for) missingFields.push('looking_for');
+    if (!fcm_token) missingFields.push('fcm_token');
 
     if (missingFields.length > 0) {
       return res.status(400).json({
@@ -220,8 +221,8 @@ exports.registerUser = async (req, res) => {
         mobile, email, first_name, about, dob, gender, interested_in,
         height_cm, looking_for, more_about, religion, languages,
         lifestyle_smoking, lifestyle_drinking, lifestyle_workout, diet,
-        lat, lng, distance_preferred,fcm_token, is_otp_verified, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, 1, NOW(), NOW())`,
+        lat, lng, distance_preferred, fcm_token, is_otp_verified, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
       [
         mobile,
         email,
@@ -402,8 +403,6 @@ exports.verifyOtp = async (req, res) => {
     const parsedInterestedIn = Array.isArray(interested_in) ? interested_in : [interested_in];
     const parsedLanguages = Array.isArray(languages) ? languages : languages ? [languages] : [];
 
-    // NOTE: column list ke end me trailing comma thi (`...updated_at,\n)`)
-    // jo invalid SQL hai - fixed.
     const [result] = await db.query(
       `INSERT INTO users (
         mobile, email, first_name, about, dob, gender, interested_in,
