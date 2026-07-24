@@ -93,42 +93,76 @@ const requestOtpProvider = (url) => new Promise((resolve, reject) => {
 
 // ---------- 1) SEND OTP ----------
 
+// exports.sendOtp = async (req, res) => {
+//   try {
+//     const { mobile } = req.body;
+//     if (!mobile || !MOBILE_REGEX.test(String(mobile))) {
+//       return res.status(400).json({ status: 400, message: 'Valid mobile number required' });
+//     }
+
+//     const merchantKey = process.env.API_MERCHANT_KEY;
+//     if (!merchantKey && !isMockOtpEnabled()) {
+//       throw new Error('API_MERCHANT_KEY not configured');
+//     }
+
+//     if (isMockOtpEnabled()) {
+//       const otp = generateOtpCode();
+//       saveMockOtp(mobile, otp);
+//       console.log(`Mock OTP for ${mobile}: ${otp}`);
+//       return res.status(200).json({
+//         status: 200,
+//         message: 'OTP sent successfully (mock mode)',
+//         otp: process.env.NODE_ENV !== 'production' ? otp : undefined,
+//       });
+//     }
+
+//     const url = `https://indopay.cloud/otp/newsend_otp.php?merchant_key=${merchantKey}&mobile_no=${mobile}&digit=4`;
+//     const response = await requestOtpProvider(url);
+//     if (!response.ok) {
+//       throw new Error(`OTP provider returned status ${response.status}: ${response.raw || 'No response body'}`);
+//     }
+
+//     return res.status(200).json({ status: 200, message: 'OTP sent successfully' });
+//   } catch (err) {
+//     console.error('SEND OTP ERROR:', err.message);
+//     return res.status(500).json({ status: 500, message: err.message });
+//   }
+// };
+
 exports.sendOtp = async (req, res) => {
   try {
     const { mobile } = req.body;
     if (!mobile || !MOBILE_REGEX.test(String(mobile))) {
       return res.status(400).json({ status: 400, message: 'Valid mobile number required' });
     }
-
+ 
     const merchantKey = process.env.API_MERCHANT_KEY;
     if (!merchantKey && !isMockOtpEnabled()) {
       throw new Error('API_MERCHANT_KEY not configured');
     }
-
+ 
     if (isMockOtpEnabled()) {
       const otp = generateOtpCode();
       saveMockOtp(mobile, otp);
       console.log(`Mock OTP for ${mobile}: ${otp}`);
       return res.status(200).json({
-        status: 200,
         message: 'OTP sent successfully (mock mode)',
         otp: process.env.NODE_ENV !== 'production' ? otp : undefined,
       });
     }
-
+ 
     const url = `https://indopay.cloud/otp/newsend_otp.php?merchant_key=${merchantKey}&mobile_no=${mobile}&digit=4`;
     const response = await requestOtpProvider(url);
     if (!response.ok) {
       throw new Error(`OTP provider returned status ${response.status}: ${response.raw || 'No response body'}`);
     }
-
-    return res.status(200).json({ status: 200, message: 'OTP sent successfully' });
+ 
+    return res.status(200).json({ message: 'OTP sent successfully' });
   } catch (err) {
     console.error('SEND OTP ERROR:', err.message);
     return res.status(500).json({ status: 500, message: err.message });
   }
 };
-
 // ---------- 2) VERIFY OTP + LOGIN / REGISTER (single call) ----------
 // mobile + otp -> OTP provider se verify hota hai.
 //   - mobile already DB me hai -> LOGIN (baaki fields ignore, agar bheje bhi ho)
