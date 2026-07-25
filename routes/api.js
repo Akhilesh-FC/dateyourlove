@@ -31,7 +31,9 @@ router.post('/setting', settingsController.upsertSetting); // TODO: admin-auth s
 
 // ---------- PROTECTED (token required) ----------
 router.get('/profile/me', authMiddleware, userController.getProfile);
+
 router.get('/swipe/feed', authMiddleware, swipeController.getSwipeFeed);
+router.post('/swipe/action', authMiddleware, swipeController.recordSwipeAction);
 
 router.patch('/updateprofile/me', authMiddleware, upload.array('photos_add', 10), userController.updateProfile);
 
