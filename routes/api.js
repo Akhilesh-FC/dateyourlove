@@ -5,6 +5,8 @@ const optionsController = require('../controllers/Api/optionsController');
 const settingsController = require('../controllers/Api/settingsController');
 const upload = require('../middleware/upload');
 const authMiddleware = require('../middleware/authMiddleware');
+const swipeController = require('../controllers/Api/swipeController');
+
 
 router.get('/', (req, res) => res.json({ ok: true, version: 'api-v1' }));
 
@@ -29,5 +31,7 @@ router.post('/setting', settingsController.upsertSetting); // TODO: admin-auth s
 
 // ---------- PROTECTED (token required) ----------
 router.get('/profile/me', authMiddleware, userController.getProfile);
+router.get('/swipe/feed', authMiddleware, swipeController.getSwipeFeed);
+
 
 module.exports = router;
