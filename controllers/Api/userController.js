@@ -493,3 +493,123 @@ exports.verifyOtp = async (req, res) => {
     return res.status(500).json({ message: 'OTP verification failed', error: err.message });
   }
 };
+
+
+
+
+const UPDATABLE_TEXT_FIELDS = [
+  'first_name', 'about', 'more_about', 'dob', 'gender', 'height_cm', 'looking_for',
+  'religion', 'lifestyle_smoking', 'lifestyle_drinking', 'lifestyle_workout', 'diet',
+  'lat', 'lng', 'distance_preferred',
+  'pronouns', 'relationship_type', 'zodiac', 'education', 'family_plan',
+  'communication_style', 'love_style', 'pets', 'prompt',
+];
+
+// ---------- UPDATE PROFILE (protected - needs Authorization: Bearer <token>) ----------
+// PATCH, multipart/form-data. Sirf jo fields bheje jayein wahi update honge
+// (partial update) - jo nahi bheja wo waisa hi rahega jaisa DB me hai.
+//
+// Naye files "photos_add" field se aate hain (multer -> req.files).
+// Photos hatane ke liye "photos_remove" me comma-separated photo IDs bhejo, jaise "12,15".
+// "open_to" comma-separated ya JSON array string, dono chalega.
+
+exports.updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const body = req.body;
+    const uploadedFiles = req.files || [];
+
+    const [existingRows] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
+    if (!existingRows.length) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // ---- Simple text/number fields: update only the ones actually sent ----
+    const setClauses = [];
+    const values = [];
+    UPDATABLE_TEXT_FIELDS.forEach((field) => {
+      if (body[field] !== undefined) {
+        setClauses.push(`${field} = ?`);
+        values.push(body[field] === '' ? null : body[field]);
+      }
+    });
+
+    // ---- Array fields (JSON columns) ----
+    if (body.interested_in !== undefined) {
+      setClauses.push('interested_in = ?');
+      values.push(JSON.stringify(parseArrayField(body.interested_in)));
+    }
+    if (body.languages !== undefined) {
+      setClauses.push('languages = ?');
+      values.push(JSON.stringify(parseArrayField(body.languages)));
+    }
+    if (body.open_to !== undefined) {
+      setClauses.push('open_to = ?');
+      values.push(JSON.stringify(parseArrayField(body.open_to)));
+    }
+
+    if (setClauses.length > 0) {
+      setClauses.push('updated_at = NOW()');
+      await db.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`, [...values, userId]);
+    }
+
+    // ---- Remove photos ----
+    if (body.photos_remove) {
+      const idsToRemove = String(body.photos_remove)
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+      if (idsToRemove.length) {
+        const placeholders = idsToRemove.map(() => '?').join(',');
+        await db.query(
+          `DELETE FROM user_photos WHERE user_id = ? AND id IN (${placeholders})`,
+          [userId, ...idsToRemove]
+        );
+      }
+    }
+
+    // ---- Add new photos ----
+    if (uploadedFiles.length > 0) {
+      const [existingPhotoCountRows] = await db.query('SELECT COUNT(*) AS count FROM user_photos WHERE user_id = ?', [userId]);
+      const existingCount = existingPhotoCountRows[0].count;
+      const photoQueries = uploadedFiles.map((file, index) => [
+        userId,
+        `/uploads/photos/${file.filename}`,
+        existingCount + index < 4 ? 1 : 0,
+      ]);
+      await Promise.all(
+        photoQueries.map((params) =>
+          db.query('INSERT INTO user_photos (user_id, url, is_required, created_at) VALUES (?, ?, ?, NOW())', params)
+        )
+      );
+    }
+
+    // ---- Return the fresh, complete profile ----
+    const [rows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    const [photoRows] = await db.query(
+      'SELECT id, url FROM user_photos WHERE user_id = ? ORDER BY is_required DESC, id ASC',
+      [userId]
+    );
+
+    const profile = buildUserPayload(rows[0]);
+    profile.open_to = safeParseJson(rows[0].open_to, []);
+    profile.pronouns = rows[0].pronouns;
+    profile.relationship_type = rows[0].relationship_type;
+    profile.zodiac = rows[0].zodiac;
+    profile.education = rows[0].education;
+    profile.family_plan = rows[0].family_plan;
+    profile.communication_style = rows[0].communication_style;
+    profile.love_style = rows[0].love_style;
+    profile.pets = rows[0].pets;
+    profile.prompt = rows[0].prompt;
+    profile.photos = photoRows.map((p) => ({ id: p.id, url: p.url }));
+
+    return res.status(200).json({
+      message: 'Profile updated successfully',
+      user: profile,
+    });
+  } catch (err) {
+    console.error('UPDATE PROFILE ERROR:', err.message);
+    return res.status(500).json({ message: 'Unable to update profile', error: err.message });
+  }
+};
