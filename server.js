@@ -57,5 +57,5 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => console.log('disconnected', socket.id));
 });
 
-const port = process.env.PORT || 3001;
+const port = 3001;
 server.listen(port, () => console.log(`Server listening on ${port}`));

@@ -39,7 +39,7 @@ exports.getSwipeFeed = async (req, res) => {
     const userId = req.user.id;
 
     const [meRows] = await db.query(
-      'SELECT lat, lng, distance_preferred FROM users WHERE id = ?',
+      'SELECT lat, lng, distance_preferred, gender, interested_in FROM users WHERE id = ?',
       [userId]
     );
     if (!meRows.length) {
@@ -81,7 +81,7 @@ exports.getSwipeFeed = async (req, res) => {
          AND JSON_CONTAINS(u.interested_in, ?, '$')
        HAVING distance_km <= ?
        ORDER BY distance_km ASC`,
-      [me.lat, me.lng, me.lat, userId, userId, userId, me.gender, JSON.stringify([me.gender]), 25]
+      [me.lat, me.lng, me.lat, userId, userId, userId, me.gender, JSON.stringify([me.gender]), radiusKm]
     );
 
     // Photos for all users in one query (avoids N+1)
