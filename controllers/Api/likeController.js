@@ -13,18 +13,36 @@ const emitSocketNotification = (targetUserId, payload) => {
 };
 
 /** Helper – send an FCM push notification */
+// const sendFcm = async (fcmToken, title, body) => {
+//   if (!fcmToken) return; // no token → nothing to send
+//   const message = {
+//     token: fcmToken,
+//     notification: { title, body },
+//     data: { click_action: 'FLUTTER_NOTIFICATION_CLICK' },
+//   };
+//   try {
+//     await messaging.send(message);
+//     console.log('✅ FCM sent to token', fcmToken);
+//   } catch (err) {
+//     console.error('❌ FCM error:', err);
+//   }
+// };
+
 const sendFcm = async (fcmToken, title, body) => {
-  if (!fcmToken) return; // no token → nothing to send
+  if (!fcmToken) {
+    console.warn('⚠️ No FCM token found, skipping push notification');
+    return;
+  }
   const message = {
     token: fcmToken,
     notification: { title, body },
     data: { click_action: 'FLUTTER_NOTIFICATION_CLICK' },
   };
   try {
-    await messaging.send(message);
-    console.log('✅ FCM sent to token', fcmToken);
+    const response = await messaging.send(message);
+    console.log('✅ FCM sent successfully:', response);
   } catch (err) {
-    console.error('❌ FCM error:', err);
+    console.error('❌ FCM error:', err.message || err);
   }
 };
 
