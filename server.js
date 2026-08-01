@@ -27,11 +27,11 @@ app.get('/', (req, res) => {
 
 // Import routes
 const apiRoutes = require('./routes/api');
-const adminRoutes = require('./routes/admin/dashboardRoutes');
+// const adminRoutes = require('./routes/admin/dashboardRoutes');
 
 // Mount routes
 app.use('/api', apiRoutes);
-app.use('/admin', adminRoutes);
+// app.use('/admin', adminRoutes);
 
 // Socket.io setup
 const server = http.createServer(app);
