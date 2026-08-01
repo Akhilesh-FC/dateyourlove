@@ -34,4 +34,5 @@ router.get('/profile/me', authMiddleware, userController.getProfile);
 router.get('/swipe/feed', authMiddleware, swipeController.getSwipeFeed);
 router.patch('/updateprofile/me', authMiddleware, upload.array('photos_add', 10), userController.updateProfile);
 router.post('/like', authMiddleware, likeController.toggleLike);
+router.get('/likes', authMiddleware, likeController.getLikedUsers);
 module.exports = router;

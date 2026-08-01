@@ -1,6 +1,8 @@
 const db = require('../../config/db');
 const { messaging } = require('../../config/firebase'); // Firebase Admin messaging
 const { getIo } = require('../../config/socket'); // socket.io getter
+const { toFullUrl } = require('../../utils/appHelpers');
+const { buildUserPayload } = require('../../controllers/Api/userController');
 
 /** Helper – emit a socket.io notification */
 const emitSocketNotification = (targetUserId, payload) => {
@@ -98,5 +100,37 @@ exports.toggleLike = async (req, res) => {
   } catch (err) {
     console.error('LIKE API ERROR:', err);
     return res.status(500).json({ message: 'Unable to process like', error: err.message });
+  }
+};
+
+// GET /api/likes - list users liked by current user
+exports.getLikedUsers = async (req, res) => {
+  try {
+    const likerId = req.user.id;
+    // fetch liked user ids
+    const [likeRows] = await db.query('SELECT likee_id FROM user_likes WHERE liker_id = ? AND status = ?', [likerId, "like"]);
+    const likeeIds = likeRows.map(r => r.likee_id);
+    if (likeeIds.length === 0) {
+      return res.status(200).json({ likedUsers: [] });
+    }
+    // fetch user details
+    const placeholders = likeeIds.map(() => '?').join(',');
+    const [users] = await db.query(`SELECT * FROM users WHERE id IN (${placeholders})`, likeeIds);
+    // fetch photos for these users
+    const [photoRows] = await db.query(`SELECT user_id, id, url FROM user_photos WHERE user_id IN (${placeholders}) ORDER BY is_required DESC, id ASC`, likeeIds);
+    const photosByUser = {};
+    photoRows.forEach(p => {
+      if (!photosByUser[p.user_id]) photosByUser[p.user_id] = [];
+      photosByUser[p.user_id].push({ id: p.id, url: toFullUrl(p.url) });
+    });
+    const likedProfiles = users.map(u => {
+      const profile = buildUserPayload(u);
+      profile.photos = photosByUser[u.id] || [];
+      return profile;
+    });
+    return res.status(200).json({ likedUsers: likedProfiles });
+  } catch (err) {
+    console.error('GET LIKED USERS ERROR:', err);
+    return res.status(500).json({ message: 'Unable to fetch liked users', error: err.message });
   }
 };

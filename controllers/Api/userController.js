@@ -652,3 +652,5 @@ exports.verifyOtp = async (req, res) => {
     return res.status(500).json({ message: 'OTP verification failed', error: err.message });
   }
 };
+
+exports.buildUserPayload = buildUserPayload;
