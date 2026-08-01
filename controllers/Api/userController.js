@@ -541,6 +541,8 @@ exports.verifyOtp = async (req, res) => {
         return res.status(500).json({ message: 'JWT secret not configured' });
       }
       const token = jwt.sign({ id: user.id, mobile }, jwtSecret, { expiresIn: '7d' });
+      // Update FCM token if provided in request
+      await db.query('UPDATE users SET fcm_token = ? WHERE id = ?', [fcm_token || null, user.id]);
 
       const [photoRows] = await db.query(
         'SELECT id, url FROM user_photos WHERE user_id = ? ORDER BY is_required DESC, id ASC',
