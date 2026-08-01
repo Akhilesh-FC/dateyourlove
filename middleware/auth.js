@@ -1,7 +1,10 @@
-// Simple admin auth middleware: checks `x-admin-token` header against ADMIN_TOKEN env
+// middleware/auth.js
+// Session‑based protection for admin routes
 module.exports = (req, res, next) => {
-  const token = req.headers['x-admin-token'] || req.query.admin_token;
-  if (!process.env.ADMIN_TOKEN) return res.status(500).json({ error: 'admin token not configured' });
-  if (!token || token !== process.env.ADMIN_TOKEN) return res.status(401).json({ error: 'unauthorized' });
-  next();
+  if (req.session && req.session.admin) {
+    return next();
+  }
+  // Preserve original URL to redirect after login (optional)
+  const returnTo = encodeURIComponent(req.originalUrl);
+  return res.redirect(`/admin/login?returnTo=${returnTo}`);
 };

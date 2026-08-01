@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard – DateYourLove</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/admin.css" />
+</head>
+<body class="admin-body">
+  <%- include('header') %>
+  <div class="admin-wrapper">
+    <%- include('sidebar') %>
+    <main class="admin-content">
+      <h2>Dashboard</h2>
+      <p>Welcome, <strong><%= admin.email %></strong></p>
+      <div class="stats-grid">
+        <div class="stat-card"><strong>Users</strong>: <%= stats.users %></div>
+        <div class="stat-card"><strong>Products</strong>: <%= stats.products %></div>
+        <div class="stat-card"><strong>Combos</strong>: <%= stats.combos %></div>
+        <div class="stat-card"><strong>Likes</strong>: <%= stats.likes %></div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
