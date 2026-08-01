@@ -7,7 +7,6 @@ const upload = require('../middleware/upload');
 const authMiddleware = require('../middleware/authMiddleware');
 const swipeController = require('../controllers/Api/swipeController');
 
-
 router.get('/', (req, res) => res.json({ ok: true, version: 'api-v1' }));
 
 // ---------- AUTH / REGISTRATION ----------

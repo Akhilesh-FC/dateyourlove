@@ -3,16 +3,17 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-
+const session = require('express-session');
 const app = express();
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // supports x-www-form-urlencoded bodies too
+app.use(express.urlencoded({ extended: true }));
+app.use(session({ secret: process.env.SESSION_SECRET || 'dev-secret', resave: false, saveUninitialized: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const apiRoutes = require('./routes/api');
-const webRoutes = require('./routes/web');
+const adminRoutes = require('./routes/admin');
 app.use('/api', apiRoutes);
-app.use('/web', webRoutes);
+app.use('/admin', adminRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server);

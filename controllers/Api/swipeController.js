@@ -59,9 +59,7 @@ exports.getSwipeFeed = async (req, res) => {
     // doesn't show up again.
     const [rows] = await db.query(
       `SELECT
-         u.id, u.first_name, u.about, u.dob, u.gender, u.job, u.interests,
-         u.looking_for, u.height_cm, u.education, u.communication_style,
-         u.love_style, u.zodiac, u.lifestyle_smoking, u.lifestyle_drinking,
+         u.*,
          (6371 * acos(
             cos(radians(?)) * cos(radians(u.lat)) * cos(radians(u.lng) - radians(?)) +
             sin(radians(?)) * sin(radians(u.lat))
@@ -99,15 +97,16 @@ exports.getSwipeFeed = async (req, res) => {
       });
     }
 
-    const deck = rows.map((row) => {
-      const photos = photosByUser[row.id] || [];
+    const users = rows.map((row) => {
+      const photos = (photosByUser[row.id] || []).map((url) => toFullUrl(url));
       return {
+        // ---- Flutter SwipeProfile model fields (unchanged from before) ----
         id: String(row.id),
         name: row.first_name || '',
         age: calculateAge(row.dob),
         distance: formatDistanceLabel(row.distance_km),
         bio: row.about || '',
-        imageUrl: photos[0] ? toFullUrl(photos[0]) : '',
+        imageUrl: photos[0] || '',
         tag: 'Nearby',
         relationshipGoal: row.looking_for || '',
         job: row.job || '',
@@ -121,10 +120,34 @@ exports.getSwipeFeed = async (req, res) => {
         smokingHabit: row.lifestyle_smoking || '',
         drinkingHabit: row.lifestyle_drinking || '',
         interests: safeParseJson(row.interests, []),
+
+        // ---- Baaki sabhi users-related data (koi field miss na ho) ----
+        gender: row.gender,
+        pronouns: row.pronouns,
+        interested_in: safeParseJson(row.interested_in, []),
+        height_cm: row.height_cm,
+        relationship_type: row.relationship_type,
+        open_to: safeParseJson(row.open_to, []),
+        more_about: row.more_about,
+        religion: row.religion,
+        family_plan: row.family_plan,
+        pets: row.pets,
+        prompt: row.prompt,
+        languages: safeParseJson(row.languages, []),
+        lifestyle_workout: row.lifestyle_workout,
+        diet: row.diet,
+        distance_preferred: row.distance_preferred,
+        photos,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
       };
     });
 
-    return res.status(200).json({ deck });
+    return res.status(200).json({
+      radiusKm,
+      count: users.length,
+      users,
+    });
   } catch (err) {
     console.error('SWIPE FEED ERROR:', err.message);
     return res.status(500).json({ message: 'Unable to fetch swipe feed' });
