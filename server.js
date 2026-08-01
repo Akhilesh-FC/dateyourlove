@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
-const { Server } = require('socket.io');
+const { initSocket } = require('./config/socket'); // socket.io initializer
 const path = require('path');
 const session = require('express-session');
 
@@ -35,27 +35,9 @@ app.use('/api', apiRoutes);
 
 // Socket.io setup
 const server = http.createServer(app);
-const io = new Server(server);
+const io = initSocket(server); // initialize socket.io
 
-io.on('connection', (socket) => {
-  console.log('socket connected', socket.id);
 
-  socket.on('join', ({ userId }) => {
-    socket.join(`user_${userId}`);
-  });
-
-  socket.on('like', ({ fromId, toId }) => {
-    console.log(`like: ${fromId} -> ${toId}`);
-    io.to(`user_${toId}`).emit('liked', { fromId, toId });
-  });
-
-  socket.on('message', ({ fromId, toId, text }) => {
-    console.log(`message from ${fromId} to ${toId}: ${text}`);
-    io.to(`user_${toId}`).emit('message', { fromId, toId, text });
-  });
-
-  socket.on('disconnect', () => console.log('disconnected', socket.id));
-});
 
 const port = 3001;
 server.listen(port, () => console.log(`Server listening on ${port}`));

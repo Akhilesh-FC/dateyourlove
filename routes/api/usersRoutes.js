@@ -7,6 +7,7 @@ const optionsController = require('../../controllers/Api/optionsController');
 const settingsController = require('../../controllers/Api/settingsController');
 const upload = require('../../middleware/upload');
 const authMiddleware = require('../../middleware/authMiddleware');
+const likeController = require('../../controllers/Api/likeController');
 const swipeController = require('../../controllers/Api/swipeController');
 
 // Public routes
@@ -32,4 +33,5 @@ router.post('/setting', settingsController.upsertSetting);
 router.get('/profile/me', authMiddleware, userController.getProfile);
 router.get('/swipe/feed', authMiddleware, swipeController.getSwipeFeed);
 router.patch('/updateprofile/me', authMiddleware, upload.array('photos_add', 10), userController.updateProfile);
+router.post('/like', authMiddleware, likeController.toggleLike);
 module.exports = router;
