@@ -31,5 +31,5 @@ router.post('/setting', settingsController.upsertSetting);
 // Protected routes (require JWT)
 router.get('/profile/me', authMiddleware, userController.getProfile);
 router.get('/swipe/feed', authMiddleware, swipeController.getSwipeFeed);
-
+router.patch('/profile/me', authMiddleware, userController.updateProfile);
 module.exports = router;
