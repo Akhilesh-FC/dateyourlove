@@ -81,7 +81,7 @@ exports.getSwipeFeed = async (req, res) => {
          AND JSON_CONTAINS(u.interested_in, ?, '$')
        HAVING distance_km <= ?
        ORDER BY distance_km ASC`,
-      [me.lat, me.lng, me.lat, userId, userId, userId, me.gender || 'female', JSON.stringify(me.interested_in || []), radiusKm]
+      [me.lat, me.lng, me.lat, userId, userId, userId, me.gender || 'female', '"female"', radiusKm]
     );
 
     // Photos for all users in one query (avoids N+1)
