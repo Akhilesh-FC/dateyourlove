@@ -378,32 +378,16 @@ exports.updateProfile = async (req, res) => {
       values.push(JSON.stringify(parseArrayField(body.open_to)));
     }
 
+    // ---- Prompts (store raw value) ----
+    if (body.prompts !== undefined) {
+      // Directly store the provided value (string/number) in the `prompt` column
+      setClauses.push('prompt = ?');
+      values.push(body.prompts);
+    }
+    
     if (setClauses.length > 0) {
       setClauses.push('updated_at = NOW()');
       await db.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`, [...values, userId]);
-    }
-
-    // ---- Prompts (replace-all if sent) ----
-    if (body.prompts !== undefined) {
-      let prompts = [];
-      try {
-        prompts = JSON.parse(body.prompts);
-      } catch (err) {
-        return res.status(400).json({ message: 'prompts must be a valid JSON array' });
-      }
-      if (!Array.isArray(prompts)) {
-        return res.status(400).json({ message: 'prompts must be a JSON array of { prompt, answer }' });
-      }
-
-      await db.query('DELETE FROM user_prompts WHERE user_id = ?', [userId]);
-      await Promise.all(
-        prompts.map((p, index) =>
-          db.query(
-            'INSERT INTO user_prompts (user_id, prompt, answer, position, created_at) VALUES (?, ?, ?, ?, NOW())',
-            [userId, p.prompt, p.answer, index]
-          )
-        )
-      );
     }
 
     // ---- Remove photos ----
@@ -443,10 +427,7 @@ exports.updateProfile = async (req, res) => {
       'SELECT id, url FROM user_photos WHERE user_id = ? ORDER BY is_required DESC, id ASC',
       [userId]
     );
-    const [promptRows] = await db.query(
-      'SELECT id, prompt, answer FROM user_prompts WHERE user_id = ? ORDER BY position ASC',
-      [userId]
-    );
+
 
     const profile = buildUserPayload(rows[0]);
     profile.open_to = safeParseJson(rows[0].open_to, []);
@@ -459,7 +440,7 @@ exports.updateProfile = async (req, res) => {
     profile.love_style = rows[0].love_style;
     profile.pets = rows[0].pets;
     profile.photos = photoRows.map((p) => ({ id: p.id, url: toFullUrl(p.url) }));
-    profile.prompts = promptRows;
+
 
     return res.status(200).json({
       message: 'Profile updated successfully',
