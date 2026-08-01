@@ -21,6 +21,7 @@ const safeParseJson = (value, fallback) => {
   }
 };
 
+///////////////////////////
 // Poora users row -> API response shape. Sabhi columns (purane + naye) yahan
 // se aate hain, taaki har jagah (login, register, get-profile, update-profile)
 // same consistent object mile.
