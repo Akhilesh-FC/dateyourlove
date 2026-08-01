@@ -385,9 +385,15 @@ exports.updateProfile = async (req, res) => {
       values.push(body.prompts);
     }
     
+    // Ensure UPDATE runs; log details for debugging
     if (setClauses.length > 0) {
+      console.log('UpdateProfile setClauses:', setClauses);
+      console.log('UpdateProfile values:', values);
       setClauses.push('updated_at = NOW()');
       await db.query(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`, [...values, userId]);
+    } else {
+      console.log('No fields to update, only updating timestamp');
+      await db.query('UPDATE users SET updated_at = NOW() WHERE id = ?', [userId]);
     }
 
     // ---- Remove photos ----
