@@ -70,7 +70,9 @@ exports.listPlans = async (req, res) => {
       plan_id: plan.id,
       plan_name: plan.name,
       description: plan.description,
-      starting_price: durationsByPlan[plan.id] && durationsByPlan[plan.id].length ? Math.min(...durationsByPlan[plan.id].map(d => d.price)) : 0,
+      starting_price: durationsByPlan[plan.id] && durationsByPlan[plan.id].length
+        ? Math.min(...durationsByPlan[plan.id].map(d => Number(d.price)))
+        : 0,
       durations: durationsByPlan[plan.id] || [],
       features: allFeatures
         .filter(feature => Boolean(featureMap[plan.id] && featureMap[plan.id][feature.id]))
@@ -123,7 +125,7 @@ exports.getPlanDetail = async (req, res) => {
       plan_id: plan.id,
       plan_name: plan.name,
       description: plan.description,
-      starting_price: durations.length ? Math.min(...durations.map(d => d.price)) : 0,
+      starting_price: durations.length ? Math.min(...durations.map(d => Number(d.price))) : 0,
       durations: durations.map(d => ({
         id: d.id,
         type: d.type,
@@ -141,7 +143,9 @@ exports.getPlanDetail = async (req, res) => {
 exports.initiatePayment = async (req, res) => {
   try {
     const userId = req.user.id;
-    const plan_duration_id = req.body.plan_duration_id || req.body.planDurationId || req.body.plan_duration_id || req.body.planDuration_id;
+
+    // Duplicate/redundant fallbacks hata diye — sirf 2 valid naming conventions rakhe
+    const plan_duration_id = req.body.plan_duration_id || req.body.planDurationId;
 
     if (!plan_duration_id) {
       return res.status(400).json({ message: 'Missing plan_duration_id in request body' });
@@ -161,19 +165,29 @@ exports.initiatePayment = async (req, res) => {
     }
     const planDuration = planDurationRows[0];
 
+    // FIX: MySQL DECIMAL column kabhi-kabhi string return karta hai driver ke hisaab se.
+    // Number() se wrap karke Number.toFixed() call kiya — pehle agar price string aata to
+    // '.toFixed is not a function' jaisa runtime crash ho sakta tha.
+    const priceValue = Number(planDuration.price);
+    if (Number.isNaN(priceValue) || priceValue <= 0) {
+      return res.status(500).json({ message: 'Invalid price configured for this plan duration' });
+    }
+
     const orderId = `ORD-${uuidv4()}`;
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // placeholder
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // placeholder, webhook corrects this
 
     await db.query(
-      `INSERT INTO user_subscriptions (user_id, plan_duration_id, paytm_order_id, plan_name, duration_type, price_paid, status, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      `INSERT INTO user_subscriptions
+        (user_id, plan_duration_id, paytm_order_id, plan_name, duration_type, price_paid, status, start_date, end_date)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
       [
         userId,
         planDurationId,
         orderId,
         planDuration.name,
         planDuration.type,
-        planDuration.price,
+        priceValue,
         now.toISOString().slice(0, 10),
         expiresAt.toISOString().slice(0, 10)
       ]
@@ -182,19 +196,56 @@ exports.initiatePayment = async (req, res) => {
     const txnParams = {
       orderId,
       custId: String(userId),
-      amount: planDuration.price.toFixed(2),
+      amount: priceValue.toFixed(2),
       email: req.user.email || '',
       mobile: req.user.mobile || ''
     };
-    const { params, checksum } = buildTransactionParams(txnParams);
+
+    // FIX: buildTransactionParams async hai, isliye await zaroori hai
+    let body, head;
+    try {
+      ({ body, head } = await buildTransactionParams(txnParams));
+    } catch (sigErr) {
+      console.error('SIGNATURE BUILD ERROR:', sigErr);
+      return res.status(500).json({ message: 'Unable to generate payment signature', error: sigErr.message });
+    }
+
+    const paytmUrl = process.env.PAYTM_ENV === 'PROD'
+      ? `https://securegw.paytm.in/theia/api/v1/initiateTransaction?mid=${process.env.PAYTM_MID}&orderId=${orderId}`
+      : `https://securegw-stage.paytm.in/theia/api/v1/initiateTransaction?mid=${process.env.PAYTM_MID}&orderId=${orderId}`;
+console.log(paytmUrl, 'paytmUrl');
+    let txnToken = null;
+    try {
+      const response = await fetch(paytmUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ head, body })
+      });
+      const json = await response.json();
+      txnToken = json?.body?.txnToken || null;
+
+      if (!txnToken) {
+        console.error('PAYTM INIT FAILED RESPONSE:', JSON.stringify(json, null, 2));
+        return res.status(502).json({
+          message: 'Unable to initiate PayTM payment',
+          paytmResponse: json
+        });
+      }
+    } catch (paytmErr) {
+      console.error('PAYTM INIT REQUEST ERROR:', paytmErr);
+      return res.status(502).json({
+        message: 'Unable to initiate PayTM payment',
+        error: paytmErr.message
+      });
+    }
 
     return res.status(200).json({
       message: 'Payment initiation successful',
-      paytmParams: params,
-      checksum,
-      paytmUrl: process.env.PAYTM_ENV === 'PROD'
-        ? 'https://securegw.paytm.in/theia/api/v1/initiateTransaction?mid=' + process.env.PAYTM_MID + '&orderId=' + orderId
-        : 'https://securegw-stage.paytm.in/theia/api/v1/initiateTransaction?mid=' + process.env.PAYTM_MID + '&orderId=' + orderId
+      orderId,
+      paytmRequest: body,
+      head,
+      paytmUrl,
+      txnToken
     });
   } catch (err) {
     console.error('PAYMENT INIT ERROR:', err);

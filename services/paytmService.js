@@ -1,49 +1,41 @@
 // services/paytmService.js
-const crypto = require('crypto');
+const PaytmChecksum = require('paytmchecksum');
 
 // Load PayTM credentials from environment variables
 const MID = process.env.PAYTM_MID;
 const MERCHANT_KEY = process.env.PAYTM_MERCHANT_KEY;
-const WEBSITE = process.env.PAYTM_WEBSITE || 'DEFAULT';
+const WEBSITE = process.env.PAYTM_WEBSITE || 'WEBSTAGING'; // use staging name for sandbox
 const CHANNEL_ID = process.env.PAYTM_CHANNEL_ID || 'WEB';
 const INDUSTRY_TYPE_ID = process.env.PAYTM_INDUSTRY_TYPE_ID || 'Retail';
 const CALLBACK_URL = process.env.PAYTM_CALLBACK_URL; // e.g., https://your-domain.com/api/paytm/webhook
 
-/**
- * Generate a checksum for PayTM transaction parameters.
- * The checksum algorithm here uses SHA‑256 over a pipe‑joined string of sorted key|value pairs
- * plus the merchant key, matching the simple implementation used in the controller.
- */
+/** Generate checksum using PaytmChecksum library (returns a Promise) */
 function generateChecksum(params) {
-  const data = Object.keys(params)
-    .sort()
-    .map((k) => `${k}|${params[k]}`)
-    .join('|');
-  return crypto.createHash('sha256').update(data + '|' + MERCHANT_KEY).digest('hex');
+  return PaytmChecksum.generateSignature(JSON.stringify(params), MERCHANT_KEY);
 }
 
-/** Verify the checksum returned by PayTM */
+/** Verify checksum returned by PayTM */
 function verifyChecksum(params, checksum) {
-  const expected = generateChecksum(params);
-  return expected === checksum;
+  return PaytmChecksum.verifySignature(JSON.stringify(params), MERCHANT_KEY, checksum);
 }
 
-/** Build transaction parameters for a given order */
-function buildTransactionParams({ orderId, custId, amount, email, mobile }) {
-  const params = {
-    MID,
-    WEBSITE,
-    CHANNEL_ID,
-    INDUSTRY_TYPE_ID,
-    ORDER_ID: orderId,
-    CUST_ID: custId,
-    TXN_AMOUNT: amount,
-    EMAIL: email,
-    MOBILE_NO: mobile,
-    CALLBACK_URL,
+/** Build transaction request payload for initiateTransaction */
+async function buildTransactionParams({ orderId, custId, amount, email, mobile }) {
+  const body = {
+    requestType: 'Payment',
+    mid: MID,
+    websiteName: WEBSITE,
+    orderId,
+    callbackUrl: CALLBACK_URL,
+    txnAmount: { value: amount, currency: 'INR' },
+    userInfo: { custId, email: email || undefined, mobile: mobile || undefined },
+    channelId: CHANNEL_ID,
+    industryTypeId: INDUSTRY_TYPE_ID
   };
-  const checksum = generateChecksum(params);
-  return { params, checksum };
+
+  const signature = await generateChecksum(body);
+  const head = { signature };
+  return { body, head };
 }
 
 module.exports = { buildTransactionParams, verifyChecksum };

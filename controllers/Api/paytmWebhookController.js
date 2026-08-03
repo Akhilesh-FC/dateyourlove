@@ -7,12 +7,18 @@ exports.handle = async (req, res) => {
     const received = req.body;
     const checksum = received.CHECKSUMHASH;
     const { CHECKSUMHASH, ...params } = received;
-    if (!verifyChecksum(params, checksum)) {
+
+    // ⚠️ IMPORTANT FIX: verifyChecksum ab async hai, isliye AWAIT lagana zaroori hai
+    const isValid = await verifyChecksum(params, checksum);
+
+    if (!isValid) {
       console.warn('PayTM checksum verification failed');
       return res.status(400).json({ message: 'Checksum verification failed' });
     }
+
     const orderId = params.ORDERID;
     const txnStatus = params.STATUS;
+
     const [subs] = await db.query(
       `SELECT us.*, pd.type AS duration_type
        FROM user_subscriptions us
@@ -20,6 +26,7 @@ exports.handle = async (req, res) => {
        WHERE us.paytm_order_id = ?`,
       [orderId]
     );
+
     if (!subs.length) {
       return res.status(404).json({ message: 'Subscription not found' });
     }
@@ -31,6 +38,7 @@ exports.handle = async (req, res) => {
       if (subscription.duration_type === '1_week') durationDays = 7;
       else if (subscription.duration_type === '1_month') durationDays = 30;
       else if (subscription.duration_type === '6_months') durationDays = 180;
+
       const expiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
       await db.query(
@@ -39,6 +47,7 @@ exports.handle = async (req, res) => {
          WHERE id = ?`,
         [params.TXNID, now.toISOString().slice(0, 10), expiresAt.toISOString().slice(0, 10), subscription.id]
       );
+
       return res.status(200).json({ message: 'Subscription activated' });
     } else {
       await db.query(
@@ -47,6 +56,7 @@ exports.handle = async (req, res) => {
          WHERE id = ?`,
         [params.TXNID || null, subscription.id]
       );
+
       return res.status(200).json({ message: 'Payment failed, subscription cancelled' });
     }
   } catch (err) {
