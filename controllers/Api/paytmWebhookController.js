@@ -13,21 +13,40 @@ exports.handle = async (req, res) => {
     }
     const orderId = params.ORDERID;
     const txnStatus = params.STATUS;
-    const [subs] = await db.query('SELECT * FROM user_subscriptions WHERE paytm_order_id = ?', [orderId]);
+    const [subs] = await db.query(
+      `SELECT us.*, pd.type AS duration_type
+       FROM user_subscriptions us
+       JOIN plan_durations pd ON pd.id = us.plan_duration_id
+       WHERE us.paytm_order_id = ?`,
+      [orderId]
+    );
     if (!subs.length) {
       return res.status(404).json({ message: 'Subscription not found' });
     }
     const subscription = subs[0];
+
     if (txnStatus === 'TXN_SUCCESS') {
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      let durationDays = 30;
+      if (subscription.duration_type === '1_week') durationDays = 7;
+      else if (subscription.duration_type === '1_month') durationDays = 30;
+      else if (subscription.duration_type === '6_months') durationDays = 180;
+      const expiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
       await db.query(
-        `UPDATE user_subscriptions SET status = 'active', paytm_txn_id = ?, started_at = ?, expires_at = ?, updated_at = NOW() WHERE id = ?`,
-        [params.TXNID, now, expiresAt, subscription.id]
+        `UPDATE user_subscriptions
+         SET status = 'active', paytm_txn_id = ?, start_date = ?, end_date = ?, updated_at = NOW()
+         WHERE id = ?`,
+        [params.TXNID, now.toISOString().slice(0, 10), expiresAt.toISOString().slice(0, 10), subscription.id]
       );
       return res.status(200).json({ message: 'Subscription activated' });
     } else {
-      await db.query(`UPDATE user_subscriptions SET status = 'cancelled', updated_at = NOW() WHERE id = ?`, [subscription.id]);
+      await db.query(
+        `UPDATE user_subscriptions
+         SET status = 'cancelled', paytm_txn_id = ?, updated_at = NOW()
+         WHERE id = ?`,
+        [params.TXNID || null, subscription.id]
+      );
       return res.status(200).json({ message: 'Payment failed, subscription cancelled' });
     }
   } catch (err) {

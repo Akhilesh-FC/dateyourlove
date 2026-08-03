@@ -166,8 +166,17 @@ exports.initiatePayment = async (req, res) => {
     const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // placeholder
 
     await db.query(
-      `INSERT INTO user_subscriptions (user_id, plan_duration_id, status, start_date, end_date) VALUES (?, ?, 'pending', ?, ?)`,
-      [userId, planDurationId, now.toISOString().slice(0, 10), expiresAt.toISOString().slice(0, 10)]
+      `INSERT INTO user_subscriptions (user_id, plan_duration_id, paytm_order_id, plan_name, duration_type, price_paid, status, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      [
+        userId,
+        planDurationId,
+        orderId,
+        planDuration.name,
+        planDuration.type,
+        planDuration.price,
+        now.toISOString().slice(0, 10),
+        expiresAt.toISOString().slice(0, 10)
+      ]
     );
 
     const txnParams = {
