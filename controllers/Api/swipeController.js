@@ -231,15 +231,43 @@ exports.recordSwipeAction = async (req, res) => {
 
     let matched = false;
     if (action === 'like' || action === 'superlike') {
+      const [targetUserRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [targetUserId]);
+      const targetToken = targetUserRows[0] ? targetUserRows[0].fcm_token : null;
+
+      const likePayload = {
+        type: action,
+        from: userId,
+        message: `User ${userId} ${action === 'like' ? 'liked' : 'superliked'} you!`,
+      };
+      const io = getIo();
+      if (io) {
+        io.to(`user_${targetUserId}`).emit('liked', likePayload);
+        io.to(`user_${targetUserId}`).emit('notification', likePayload);
+      }
+
+      const title = action === 'like' ? 'New Like!' : 'New Superlike!';
+      const bodyMessage = action === 'like'
+        ? `User ${userId} liked your profile.`
+        : `User ${userId} superliked your profile.`;
+      if (targetToken) {
+        try {
+          await messaging.send({
+            token: targetToken,
+            notification: { title, body: bodyMessage },
+            data: { type: action, fromUserId: String(userId) }
+          });
+        } catch (err) {
+          console.error('FCM like notification error:', err.message || err);
+        }
+      }
+
       const [mutual] = await db.query(
         `SELECT id FROM swipes WHERE user_id = ? AND target_user_id = ? AND action IN ('like','superlike')`,
         [targetUserId, userId]
       );
       if (mutual.length > 0 && !['like','superlike'].includes(existingStatus)) {
         matched = true;
-        const [targetUserRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [targetUserId]);
         const [meRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [userId]);
-        const targetToken = targetUserRows[0] ? targetUserRows[0].fcm_token : null;
         const myToken = meRows[0] ? meRows[0].fcm_token : null;
 
         const matchPayload = {
@@ -248,10 +276,11 @@ exports.recordSwipeAction = async (req, res) => {
           message: 'A new match has been created!'
         };
 
-        const io = getIo();
         if (io) {
           io.to(`user_${userId}`).emit('match', matchPayload);
           io.to(`user_${targetUserId}`).emit('match', matchPayload);
+          io.to(`user_${userId}`).emit('notification', matchPayload);
+          io.to(`user_${targetUserId}`).emit('notification', matchPayload);
         }
 
         const sendFcm = async (token, title, body) => {

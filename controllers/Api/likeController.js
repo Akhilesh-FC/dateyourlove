@@ -4,10 +4,11 @@ const { getIo } = require('../../config/socket'); // socket.io getter
 const { toFullUrl } = require('../../utils/appHelpers');
 const { buildUserPayload } = require('../../controllers/Api/userController');
 
-/** Helper – emit a socket.io notification */
-const emitSocketNotification = (targetUserId, payload) => {
+/** Helper – emit socket.io events for notification and compatibility */
+const emitSocketEvents = (targetUserId, event, payload) => {
   const io = getIo();
   if (io) {
+    io.to(`user_${targetUserId}`).emit(event, payload);
     io.to(`user_${targetUserId}`).emit('notification', payload);
   } else {
     console.warn('Socket.io not initialized');
@@ -190,6 +191,21 @@ exports.toggleLike = async (req, res) => {
 
     let matched = false;
     if (action === 'like' || action === 'superlike') {
+      const [targetUserRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [likee_id]);
+      const fcmToken = targetUserRows[0] ? targetUserRows[0].fcm_token : null;
+
+      emitSocketEvents(likee_id, 'liked', {
+        type: action,
+        from: likerId,
+        message: `User ${likerId} ${action === 'like' ? 'liked' : 'superliked'} you!`,
+      });
+
+      const title = action === 'like' ? 'New Like!' : 'New Superlike!';
+      const bodyMessage = action === 'like'
+        ? `User ${likerId} liked your profile.`
+        : `User ${likerId} superliked your profile.`;
+      await sendFcm(fcmToken, title, bodyMessage);
+
       const [mutualLikeRows] = await db.query(
         `SELECT status FROM user_likes
          WHERE liker_id = ? AND likee_id = ?
@@ -202,9 +218,7 @@ exports.toggleLike = async (req, res) => {
 
       if (targetAlreadyLikedYou && isNewPositiveAction) {
         matched = true;
-        const [targetUserRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [likee_id]);
         const [meRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [likerId]);
-        const targetToken = targetUserRows[0] ? targetUserRows[0].fcm_token : null;
         const myToken = meRows[0] ? meRows[0].fcm_token : null;
 
         const matchPayload = {
@@ -213,8 +227,8 @@ exports.toggleLike = async (req, res) => {
           message: 'You have a new match!'
         };
 
-        emitSocketNotification(likee_id, matchPayload);
-        emitSocketNotification(likerId, matchPayload);
+        emitSocketEvents(likee_id, 'match', matchPayload);
+        emitSocketEvents(likerId, 'match', matchPayload);
 
         await Promise.all([
           sendFcm(targetToken, 'New Match!', 'You have a new match.'),
