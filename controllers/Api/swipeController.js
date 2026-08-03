@@ -53,6 +53,19 @@ exports.getSwipeFeed = async (req, res) => {
 
     const radiusKm = me.distance_preferred || DEFAULT_RADIUS_KM;
 
+    const [countRows] = await db.query(
+      `SELECT
+         SUM(action = 'like') AS likesToday,
+         SUM(action = 'superlike') AS superlikesToday
+       FROM swipes
+       WHERE user_id = ?
+         AND DATE(created_at) = CURDATE()`,
+      [userId]
+    );
+
+    const likesToday = Number(countRows[0]?.likesToday || 0);
+    const superlikesToday = Number(countRows[0]?.superlikesToday || 0);
+
     // Haversine formula + a LEFT JOIN against `swipes` to know if this
     // person already liked/superliked me (-> likesYou), and excludes anyone
     // I've already swiped on (like/pass/superlike) so the same profile
@@ -148,6 +161,8 @@ exports.getSwipeFeed = async (req, res) => {
     return res.status(200).json({
       radiusKm,
       count: users.length,
+      likesToday,
+      superlikesToday,
       users,
     });
   } catch (err) {

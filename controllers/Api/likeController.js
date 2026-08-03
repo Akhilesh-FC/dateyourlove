@@ -50,20 +50,134 @@ const sendFcm = async (fcmToken, title, body) => {
 
 /**
  * POST /api/like
- * Body: { likee_id: <id>, status: 'like' | 'unlike', details?: <any> }
+ * Body: { likee_id: <id>, action: 'like' | 'unlike' | 'superlike', details?: <any> }
+ * Also accepts `status` for backward compatibility.
  * req.user.id is populated by auth middleware.
  */
+const ALLOWED_LIKE_ACTIONS = new Set(['like', 'unlike', 'superlike']);
+const DEFAULT_LIKE_LIMITS = { maxDailyLikes: 3, maxDailySuperlikes: 1 };
+
+async function getFreeUserLikeLimits() {
+  try {
+    const [rows] = await db.query(
+      `SELECT max_daily_likes AS maxDailyLikes, max_daily_superlikes AS maxDailySuperlikes
+       FROM like_limits
+       WHERE type = 'free_user'
+       LIMIT 1`
+    );
+    if (rows.length) {
+      return {
+        maxDailyLikes: Number(rows[0].maxDailyLikes || DEFAULT_LIKE_LIMITS.maxDailyLikes),
+        maxDailySuperlikes: Number(rows[0].maxDailySuperlikes || DEFAULT_LIKE_LIMITS.maxDailySuperlikes)
+      };
+    }
+  } catch (err) {
+    console.warn('LIKE LIMITS TABLE unavailable, using defaults:', err.message);
+  }
+  return DEFAULT_LIKE_LIMITS;
+}
+
+async function userHasActiveSubscription(userId) {
+  const [rows] = await db.query(
+    `SELECT COUNT(*) AS count
+     FROM user_subscriptions
+     WHERE user_id = ?
+       AND status = 'active'
+       AND start_date <= CURDATE()
+       AND end_date >= CURDATE()`,
+    [userId]
+  );
+  return Number(rows[0]?.count || 0) > 0;
+}
+
 exports.toggleLike = async (req, res) => {
   try {
     const likerId = req.user.id;
-    const { likee_id, status, details } = req.body;
+    const { likee_id, action: rawAction, details } = req.body;
+    const action = rawAction || req.body.status;
 
-    // Basic validation
-    if (!likee_id || !['like', 'unlike'].includes(status)) {
+    if (!likee_id || !ALLOWED_LIKE_ACTIONS.has(action)) {
       return res.status(400).json({ message: 'Invalid request payload' });
     }
 
-    // Upsert like record
+    const [existingRows] = await db.query(
+      'SELECT status FROM user_likes WHERE liker_id = ? AND likee_id = ?',
+      [likerId, likee_id]
+    );
+    const existingStatus = existingRows.length ? existingRows[0].status : null;
+
+    const isSubscribed = await userHasActiveSubscription(likerId);
+    let limitInfo = {
+      isSubscribed,
+      maxDailyLikes: DEFAULT_LIKE_LIMITS.maxDailyLikes,
+      maxDailySuperlikes: DEFAULT_LIKE_LIMITS.maxDailySuperlikes,
+      likesToday: 0,
+      superlikesToday: 0,
+      canLike: true,
+      canSuperlike: true
+    };
+
+    if (!isSubscribed) {
+      const limits = await getFreeUserLikeLimits();
+      limitInfo.maxDailyLikes = limits.maxDailyLikes;
+      limitInfo.maxDailySuperlikes = limits.maxDailySuperlikes;
+
+      const [countRows] = await db.query(
+        `SELECT
+           SUM(status = 'like') AS likesToday,
+           SUM(status = 'superlike') AS superlikesToday
+         FROM user_likes
+         WHERE liker_id = ?
+           AND DATE(updated_at) = CURDATE()`,
+        [likerId]
+      );
+
+      const currentLikes = Number(countRows[0]?.likesToday || 0);
+      const currentSuperlikes = Number(countRows[0]?.superlikesToday || 0);
+      let projectedLikes = currentLikes;
+      let projectedSuperlikes = currentSuperlikes;
+
+      if (existingStatus === 'like' && action !== 'like') projectedLikes -= 1;
+      if (existingStatus === 'superlike' && action !== 'superlike') projectedSuperlikes -= 1;
+      if (action === 'like' && existingStatus !== 'like') projectedLikes += 1;
+      if (action === 'superlike' && existingStatus !== 'superlike') projectedSuperlikes += 1;
+
+      limitInfo.likesToday = projectedLikes;
+      limitInfo.superlikesToday = projectedSuperlikes;
+      limitInfo.canLike = projectedLikes <= limits.maxDailyLikes;
+      limitInfo.canSuperlike = projectedSuperlikes <= limits.maxDailySuperlikes;
+      limitInfo.likesRemaining = Math.max(0, limits.maxDailyLikes - projectedLikes);
+      limitInfo.superlikesRemaining = Math.max(0, limits.maxDailySuperlikes - projectedSuperlikes);
+
+      if (action === 'like' && projectedLikes > limits.maxDailyLikes) {
+        return res.status(403).json({
+          message: 'Daily like limit reached',
+          limitInfo: {
+            ...limitInfo,
+            likesToday: currentLikes,
+            maxDailyLikes: limits.maxDailyLikes,
+            canLike: false,
+            likesRemaining: 0
+          },
+          code: 'LIKE_LIMIT_REACHED'
+        });
+      }
+
+      if (action === 'superlike' && projectedSuperlikes > limits.maxDailySuperlikes) {
+        return res.status(403).json({
+          message: 'Daily superlike limit reached',
+          limitInfo: {
+            ...limitInfo,
+            superlikesToday: currentSuperlikes,
+            maxDailySuperlikes: limits.maxDailySuperlikes,
+            canSuperlike: false,
+            superlikesRemaining: 0
+          },
+          code: 'SUPERLIKE_LIMIT_REACHED'
+        });
+      }
+    }
+
     await db.query(
       `INSERT INTO user_likes (liker_id, likee_id, status, details)
        VALUES (?, ?, ?, ?)
@@ -71,31 +185,30 @@ exports.toggleLike = async (req, res) => {
          status = VALUES(status),
          details = VALUES(details),
          updated_at = NOW()`,
-      [likerId, likee_id, status, details ? JSON.stringify(details) : null]
+      [likerId, likee_id, action, details ? JSON.stringify(details) : null]
     );
 
-    // Retrieve target user's FCM token
     const [userRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [likee_id]);
     const fcmToken = userRows[0] ? userRows[0].fcm_token : null;
 
-    // Send notifications if it's a like
-    if (status === 'like') {
-      // Socket.io notification (in‑app)
+    if (action === 'like' || action === 'superlike') {
       emitSocketNotification(likee_id, {
-        type: 'like',
+        type: action,
         from: likerId,
-        message: `User ${likerId} liked you!`,
+        message: `User ${likerId} ${action === 'like' ? 'liked' : 'superliked'} you!`,
       });
 
-      // FCM push notification
-      const title = 'New Like!';
-      const body = `User ${likerId} liked your profile.`;
-      await sendFcm(fcmToken, title, body);
+      const title = action === 'like' ? 'New Like!' : 'New Superlike!';
+      const bodyMessage = action === 'like'
+        ? `User ${likerId} liked your profile.`
+        : `User ${likerId} superliked your profile.`;
+      await sendFcm(fcmToken, title, bodyMessage);
     }
 
     return res.status(200).json({
-      message: `Successfully recorded ${status}`,
-      like: { liker_id: likerId, likee_id, status, details },
+      message: `Successfully recorded ${action}`,
+      like: { liker_id: likerId, likee_id, status: action, details },
+      limitInfo
     });
   } catch (err) {
     console.error('LIKE API ERROR:', err);

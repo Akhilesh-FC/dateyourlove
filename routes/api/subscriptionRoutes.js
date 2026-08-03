@@ -15,5 +15,6 @@ router.post('/subscribe', authMiddleware, subscriptionController.initiatePayment
 
 // PayTM webhook (POST) – no auth needed, PayTM will call this URL
 router.post('/paytm/webhook', paytmWebhookController.handle);
+router.post('/subscription/paytm/webhook', paytmWebhookController.handle); // alias for env callback URL
 
 module.exports = router;
