@@ -7,26 +7,74 @@ const { v4: uuidv4 } = require('uuid');
 exports.listPlans = async (req, res) => {
   try {
     const planId = req.query.id ? Number(req.query.id) : null;
-    let sql = `SELECT p.id, p.name, p.description, pd.type AS duration, pd.price
-       FROM plans p
-       JOIN plan_durations pd ON pd.plan_id = p.id`;
-    const params = [];
-
-    if (planId && !Number.isNaN(planId)) {
-      sql += ' WHERE p.id = ?';
-      params.push(planId);
+    if (req.query.id && Number.isNaN(planId)) {
+      return res.status(400).json({ message: 'Invalid plan id' });
     }
 
-    sql += ' ORDER BY p.id, FIELD(pd.type,\'1_week\',\'1_month\',\'6_months\')';
+    const planWhere = planId ? ' WHERE id = ?' : ' WHERE name IN (\'Silver\', \'Gold\', \'Platinum Plus\')';
+    const planParams = planId ? [planId] : [];
+    const [plansRows] = await db.query(
+      `SELECT id, name, description
+       FROM plans${planWhere}
+       ORDER BY FIELD(name,'Silver','Gold','Platinum Plus'), id`,
+      planParams
+    );
 
-    const [rows] = await db.query(sql, params);
+    if (!plansRows.length) {
+      return res.status(200).json({ plans: [] });
+    }
 
-    const plans = rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      duration: row.duration,
-      price_cents: row.price * 100
+    const planIds = plansRows.map(plan => plan.id);
+    const planIdPlaceholders = planIds.map(() => '?').join(',');
+
+    const [durationRows] = await db.query(
+      `SELECT id, plan_id, type, price
+       FROM plan_durations
+       WHERE plan_id IN (${planIdPlaceholders})
+       ORDER BY FIELD(type,'1_week','1_month','6_months')`,
+      planIds
+    );
+
+    const [allFeatures] = await db.query(
+      `SELECT id, label AS name FROM features ORDER BY id`
+    );
+
+    const [planFeatureRows] = await db.query(
+      `SELECT plan_id, feature_id, is_active
+       FROM plan_features
+       WHERE plan_id IN (${planIdPlaceholders})`,
+      planIds
+    );
+
+    const featureMap = planFeatureRows.reduce((map, row) => {
+      if (!map[row.plan_id]) {
+        map[row.plan_id] = {};
+      }
+      map[row.plan_id][row.feature_id] = row.is_active === 1;
+      return map;
+    }, {});
+
+    const durationsByPlan = durationRows.reduce((map, row) => {
+      if (!map[row.plan_id]) {
+        map[row.plan_id] = [];
+      }
+      map[row.plan_id].push({
+        id: row.id,
+        type: row.type,
+        price: row.price
+      });
+      return map;
+    }, {});
+
+    const plans = plansRows.map(plan => ({
+      plan_id: plan.id,
+      plan_name: plan.name,
+      description: plan.description,
+      starting_price: durationsByPlan[plan.id] && durationsByPlan[plan.id].length ? Math.min(...durationsByPlan[plan.id].map(d => d.price)) : 0,
+      durations: durationsByPlan[plan.id] || [],
+      features: allFeatures
+        .filter(feature => Boolean(featureMap[plan.id] && featureMap[plan.id][feature.id]))
+        .map(feature => feature.name)
     }));
 
     return res.status(200).json({ plans });
@@ -52,7 +100,7 @@ exports.getPlanDetail = async (req, res) => {
     const plan = planRows[0];
 
     const [durations] = await db.query(
-      `SELECT type, price
+      `SELECT id, type, price
        FROM plan_durations
        WHERE plan_id = ?
        ORDER BY FIELD(type,'1_week','1_month','6_months')`,
@@ -60,12 +108,13 @@ exports.getPlanDetail = async (req, res) => {
     );
 
     const [features] = await db.query(
-      `SELECT f.name,
+      `SELECT f.label AS name,
               IFNULL(pf.is_active, 0) AS is_active
        FROM features f
        LEFT JOIN plan_features pf
          ON pf.feature_id = f.id
          AND pf.plan_id = ?
+       WHERE IFNULL(pf.is_active, 0) = 1
        ORDER BY f.id`,
       [planId]
     );
@@ -74,14 +123,13 @@ exports.getPlanDetail = async (req, res) => {
       plan_id: plan.id,
       plan_name: plan.name,
       description: plan.description,
+      starting_price: durations.length ? Math.min(...durations.map(d => d.price)) : 0,
       durations: durations.map(d => ({
+        id: d.id,
         type: d.type,
         price: d.price
       })),
-      features: features.map(f => ({
-        name: f.name,
-        is_active: Boolean(f.is_active)
-      }))
+      features: features.map(f => f.name)
     });
   } catch (err) {
     console.error('GET PLAN DETAIL ERROR:', err);
