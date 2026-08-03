@@ -1,6 +1,6 @@
 // controllers/Api/subscriptionController.js
 const db = require('../../config/db');
-const { buildTransactionParams } = require('../../services/paytmService');
+const { buildTransactionParams, INITIATE_URL } = require('../../services/paytmService');
 const { v4: uuidv4 } = require('uuid');
 
 // List all available plans (public)
@@ -144,7 +144,6 @@ exports.initiatePayment = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Duplicate/redundant fallbacks hata diye — sirf 2 valid naming conventions rakhe
     const plan_duration_id = req.body.plan_duration_id || req.body.planDurationId;
 
     if (!plan_duration_id) {
@@ -165,9 +164,6 @@ exports.initiatePayment = async (req, res) => {
     }
     const planDuration = planDurationRows[0];
 
-    // FIX: MySQL DECIMAL column kabhi-kabhi string return karta hai driver ke hisaab se.
-    // Number() se wrap karke Number.toFixed() call kiya — pehle agar price string aata to
-    // '.toFixed is not a function' jaisa runtime crash ho sakta tha.
     const priceValue = Number(planDuration.price);
     if (Number.isNaN(priceValue) || priceValue <= 0) {
       return res.status(500).json({ message: 'Invalid price configured for this plan duration' });
@@ -196,12 +192,9 @@ exports.initiatePayment = async (req, res) => {
     const txnParams = {
       orderId,
       custId: String(userId),
-      amount: priceValue.toFixed(2),
-      email: req.user.email || '',
-      mobile: req.user.mobile || ''
+      amount: priceValue.toFixed(2)
     };
 
-    // FIX: buildTransactionParams async hai, isliye await zaroori hai
     let body, head;
     try {
       ({ body, head } = await buildTransactionParams(txnParams));
@@ -210,10 +203,11 @@ exports.initiatePayment = async (req, res) => {
       return res.status(500).json({ message: 'Unable to generate payment signature', error: sigErr.message });
     }
 
-    const paytmUrl = process.env.PAYTM_ENV === 'PROD'
-      ? `https://securegw.paytm.in/theia/api/v1/initiateTransaction?mid=${process.env.PAYTM_MID}&orderId=${orderId}`
-      : `https://securegw-stage.paytm.in/theia/api/v1/initiateTransaction?mid=${process.env.PAYTM_MID}&orderId=${orderId}`;
-console.log(paytmUrl, 'paytmUrl');
+    // FIX: pehle "securegw-stage.paytm.in" (galat gateway) pe hit kar raha tha.
+    // Ab paytmService se exported sahi INITIATE_URL use ho raha hai.
+    const paytmUrl = `${INITIATE_URL}?mid=${process.env.PAYTM_MID}&orderId=${orderId}`;
+    console.log(paytmUrl, 'paytmUrl');
+
     let txnToken = null;
     try {
       const response = await fetch(paytmUrl, {

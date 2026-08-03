@@ -8,7 +8,6 @@ exports.handle = async (req, res) => {
     const checksum = received.CHECKSUMHASH;
     const { CHECKSUMHASH, ...params } = received;
 
-    // ⚠️ IMPORTANT FIX: verifyChecksum ab async hai, isliye AWAIT lagana zaroori hai
     const isValid = await verifyChecksum(params, checksum);
 
     if (!isValid) {
