@@ -1,5 +1,8 @@
 const db = require('../../config/db');
 const { calculateAge, toFullUrl } = require('../../utils/appHelpers');
+const { messaging } = require('../../config/firebase');
+const { getIo } = require('../../config/socket');
+const { buildUserPayload } = require('../../controllers/Api/userController');
 
 const safeParseJson = (value, fallback) => {
   if (!value) return fallback;
@@ -90,11 +93,14 @@ exports.getSwipeFeed = async (req, res) => {
          AND u.id NOT IN (
            SELECT target_user_id FROM swipes WHERE user_id = ?
          )
+       AND u.id NOT IN (
+           SELECT likee_id FROM user_likes WHERE liker_id = ?
+         )
          AND u.gender = (CASE WHEN ? = 'female' THEN 'male' ELSE 'female' END)
          AND JSON_CONTAINS(u.interested_in, ?, '$')
        HAVING distance_km <= ?
        ORDER BY distance_km ASC`,
-      [me.lat, me.lng, me.lat, userId, userId, userId, me.gender, JSON.stringify([me.gender]), radiusKm]
+      [me.lat, me.lng, me.lat, userId, userId, userId, userId, me.gender, JSON.stringify([me.gender]), radiusKm]
     );
 
     // Photos for all users in one query (avoids N+1)
@@ -170,7 +176,30 @@ exports.getSwipeFeed = async (req, res) => {
     return res.status(500).json({ message: 'Unable to fetch swipe feed' });
   }
 };
+exports.getMatches = async (req, res) => {
+  try {
+    const userId = req.user.id;
 
+    const [rows] = await db.query(
+      `SELECT u.*
+       FROM users u
+       JOIN swipes s1 ON s1.target_user_id = u.id AND s1.user_id = ? AND s1.action IN ('like','superlike')
+       JOIN swipes s2 ON s2.user_id = u.id AND s2.target_user_id = ? AND s2.action IN ('like','superlike')
+       WHERE u.id != ?`,
+      [userId, userId, userId]
+    );
+
+    const matches = rows.map((row) => buildUserPayload(row));
+
+    return res.status(200).json({
+      count: matches.length,
+      matches,
+    });
+  } catch (err) {
+    console.error('GET MATCHES ERROR:', err.message);
+    return res.status(500).json({ message: 'Unable to fetch matches' });
+  }
+};
 // ---------- POST /api/swipe/action (protected) ----------
 // Body: { targetUserId, action } where action is 'like' | 'pass' | 'superlike'
 // Records the swipe and tells the caller if it created a mutual match.
@@ -187,6 +216,12 @@ exports.recordSwipeAction = async (req, res) => {
       return res.status(400).json({ message: 'Cannot swipe on your own profile' });
     }
 
+    const [existingRows] = await db.query(
+      'SELECT action FROM swipes WHERE user_id = ? AND target_user_id = ?',
+      [userId, targetUserId]
+    );
+    const existingStatus = existingRows.length ? existingRows[0].action : null;
+
     await db.query(
       `INSERT INTO swipes (user_id, target_user_id, action)
        VALUES (?, ?, ?)
@@ -200,7 +235,43 @@ exports.recordSwipeAction = async (req, res) => {
         `SELECT id FROM swipes WHERE user_id = ? AND target_user_id = ? AND action IN ('like','superlike')`,
         [targetUserId, userId]
       );
-      matched = mutual.length > 0;
+      if (mutual.length > 0 && !['like','superlike'].includes(existingStatus)) {
+        matched = true;
+        const [targetUserRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [targetUserId]);
+        const [meRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [userId]);
+        const targetToken = targetUserRows[0] ? targetUserRows[0].fcm_token : null;
+        const myToken = meRows[0] ? meRows[0].fcm_token : null;
+
+        const matchPayload = {
+          type: 'match',
+          users: [userId, targetUserId],
+          message: 'A new match has been created!'
+        };
+
+        const io = getIo();
+        if (io) {
+          io.to(`user_${userId}`).emit('match', matchPayload);
+          io.to(`user_${targetUserId}`).emit('match', matchPayload);
+        }
+
+        const sendFcm = async (token, title, body) => {
+          if (!token) return;
+          try {
+            await messaging.send({
+              token,
+              notification: { title, body },
+              data: { type: 'match', userId: String(targetUserId) }
+            });
+          } catch (err) {
+            console.error('FCM match notification error:', err.message || err);
+          }
+        };
+
+        await Promise.all([
+          sendFcm(targetToken, 'New Match!', 'You have a new match.'),
+          sendFcm(myToken, 'New Match!', 'A match has been created.')
+        ]);
+      }
     }
 
     return res.status(200).json({ message: 'Swipe recorded', matched });

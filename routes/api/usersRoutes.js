@@ -32,7 +32,10 @@ router.post('/setting', settingsController.upsertSetting);
 // Protected routes (require JWT)
 router.get('/profile/me', authMiddleware, userController.getProfile);
 router.get('/swipe/feed', authMiddleware, swipeController.getSwipeFeed);
+router.post('/swipe/action', authMiddleware, swipeController.recordSwipeAction);
+router.get('/swipe/matches', authMiddleware, swipeController.getMatches);
 router.patch('/updateprofile/me', authMiddleware, upload.array('photos_add', 10), userController.updateProfile);
 router.post('/like', authMiddleware, likeController.toggleLike);
 router.get('/likelist', authMiddleware, likeController.getLikedUsers);
+router.get('/like/matches', authMiddleware, likeController.getMatches);
 module.exports = router;

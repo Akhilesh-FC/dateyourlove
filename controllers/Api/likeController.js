@@ -188,25 +188,44 @@ exports.toggleLike = async (req, res) => {
       [likerId, likee_id, action, details ? JSON.stringify(details) : null]
     );
 
-    const [userRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [likee_id]);
-    const fcmToken = userRows[0] ? userRows[0].fcm_token : null;
-
+    let matched = false;
     if (action === 'like' || action === 'superlike') {
-      emitSocketNotification(likee_id, {
-        type: action,
-        from: likerId,
-        message: `User ${likerId} ${action === 'like' ? 'liked' : 'superliked'} you!`,
-      });
+      const [mutualLikeRows] = await db.query(
+        `SELECT status FROM user_likes
+         WHERE liker_id = ? AND likee_id = ?
+           AND status IN ('like','superlike')`,
+        [likee_id, likerId]
+      );
 
-      const title = action === 'like' ? 'New Like!' : 'New Superlike!';
-      const bodyMessage = action === 'like'
-        ? `User ${likerId} liked your profile.`
-        : `User ${likerId} superliked your profile.`;
-      await sendFcm(fcmToken, title, bodyMessage);
+      const targetAlreadyLikedYou = mutualLikeRows.length > 0;
+      const isNewPositiveAction = existingStatus !== 'like' && existingStatus !== 'superlike';
+
+      if (targetAlreadyLikedYou && isNewPositiveAction) {
+        matched = true;
+        const [targetUserRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [likee_id]);
+        const [meRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [likerId]);
+        const targetToken = targetUserRows[0] ? targetUserRows[0].fcm_token : null;
+        const myToken = meRows[0] ? meRows[0].fcm_token : null;
+
+        const matchPayload = {
+          type: 'match',
+          users: [String(likerId), String(likee_id)],
+          message: 'You have a new match!'
+        };
+
+        emitSocketNotification(likee_id, matchPayload);
+        emitSocketNotification(likerId, matchPayload);
+
+        await Promise.all([
+          sendFcm(targetToken, 'New Match!', 'You have a new match.'),
+          sendFcm(myToken, 'New Match!', 'You have a new match.')
+        ]);
+      }
     }
 
     return res.status(200).json({
       message: `Successfully recorded ${action}`,
+      matched,
       like: { liker_id: likerId, likee_id, status: action, details },
       limitInfo
     });
@@ -245,5 +264,53 @@ exports.getLikedUsers = async (req, res) => {
   } catch (err) {
     console.error('GET LIKED USERS ERROR:', err);
     return res.status(500).json({ message: 'Unable to fetch liked users', error: err.message });
+  }
+};
+
+// GET /api/like/matches - list mutual matches based on likes/superlikes
+exports.getMatches = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [rows] = await db.query(
+      `SELECT u.*
+       FROM users u
+       JOIN user_likes ul1 ON ul1.likee_id = u.id
+         AND ul1.liker_id = ?
+         AND ul1.status IN ('like','superlike')
+       JOIN user_likes ul2 ON ul2.likee_id = ?
+         AND ul2.liker_id = u.id
+         AND ul2.status IN ('like','superlike')
+       WHERE u.id != ?`,
+      [userId, userId, userId]
+    );
+
+    if (!rows.length) {
+      return res.status(200).json({ count: 0, matches: [] });
+    }
+
+    const userIds = rows.map((row) => row.id);
+    const placeholders = userIds.map(() => '?').join(',');
+    const [photoRows] = await db.query(
+      `SELECT user_id, id, url FROM user_photos WHERE user_id IN (${placeholders}) ORDER BY is_required DESC, id ASC`,
+      userIds
+    );
+
+    const photosByUser = {};
+    photoRows.forEach((p) => {
+      if (!photosByUser[p.user_id]) photosByUser[p.user_id] = [];
+      photosByUser[p.user_id].push({ id: p.id, url: toFullUrl(p.url) });
+    });
+
+    const matches = rows.map((row) => {
+      const profile = buildUserPayload(row);
+      profile.photos = photosByUser[row.id] || [];
+      return profile;
+    });
+
+    return res.status(200).json({ count: matches.length, matches });
+  } catch (err) {
+    console.error('GET LIKE MATCHES ERROR:', err);
+    return res.status(500).json({ message: 'Unable to fetch matches', error: err.message });
   }
 };
