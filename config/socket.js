@@ -1,5 +1,6 @@
 const { Server } = require('socket.io');
 let io = null;
+const onlineUsers = new Map();
 
 /**
  * Initialise Socket.io with the HTTP server.
@@ -12,7 +13,11 @@ function initSocket(server) {
     console.log('socket connected', socket.id);
 
     socket.on('join', ({ userId }) => {
-      socket.join(`user_${userId}`);
+      const normalizedUserId = String(userId);
+      socket.data.userId = normalizedUserId;
+      socket.join(`user_${normalizedUserId}`);
+      onlineUsers.set(normalizedUserId, socket.id);
+      io.emit('presence', { userId: normalizedUserId, status: 'online' });
     });
 
     socket.on('like', ({ fromId, toId }) => {
@@ -25,7 +30,14 @@ function initSocket(server) {
       io.to(`user_${toId}`).emit('message', { fromId, toId, text });
     });
 
-    socket.on('disconnect', () => console.log('disconnected', socket.id));
+    socket.on('disconnect', () => {
+      const userId = socket.data.userId;
+      if (userId) {
+        onlineUsers.delete(userId);
+        io.emit('presence', { userId, status: 'offline' });
+      }
+      console.log('disconnected', socket.id);
+    });
   });
 
   return io;
@@ -35,4 +47,12 @@ function getIo() {
   return io;
 }
 
-module.exports = { initSocket, getIo };
+function isUserOnline(userId) {
+  return onlineUsers.has(String(userId));
+}
+
+function getOnlineUsers() {
+  return Array.from(onlineUsers.keys());
+}
+
+module.exports = { initSocket, getIo, isUserOnline, getOnlineUsers };

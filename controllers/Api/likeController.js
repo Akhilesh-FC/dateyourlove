@@ -3,6 +3,7 @@ const { messaging } = require('../../config/firebase'); // Firebase Admin messag
 const { getIo } = require('../../config/socket'); // socket.io getter
 const { toFullUrl } = require('../../utils/appHelpers');
 const { buildUserPayload } = require('../../controllers/Api/userController');
+const { ensureChatRoomForUsers } = require('../../controllers/Api/chatController');
 
 /** Helper – emit socket.io events for notification and compatibility */
 const emitSocketEvents = (targetUserId, event, payload) => {
@@ -230,6 +231,8 @@ exports.toggleLike = async (req, res) => {
 
         emitSocketEvents(likee_id, 'match', matchPayload);
         emitSocketEvents(likerId, 'match', matchPayload);
+
+        await ensureChatRoomForUsers(likerId, likee_id);
 
         await Promise.all([
           sendFcm(targetToken, 'New Match!', 'You have a new match.'),

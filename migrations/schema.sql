@@ -59,3 +59,42 @@ CREATE TABLE IF NOT EXISTS messages (
   INDEX(from_user),
   INDEX(to_user)
 );
+
+CREATE TABLE IF NOT EXISTS matches (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user1_id INT NOT NULL,
+  user2_id INT NOT NULL,
+  room_id VARCHAR(100) NOT NULL UNIQUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_match_pair (user1_id, user2_id),
+  INDEX idx_matches_user1 (user1_id),
+  INDEX idx_matches_user2 (user2_id)
+);
+
+CREATE TABLE IF NOT EXISTS chat_rooms (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  room_id VARCHAR(100) NOT NULL UNIQUE,
+  user1_id INT NOT NULL,
+  user2_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_room_users (user1_id, user2_id),
+  INDEX idx_chat_rooms_user1 (user1_id),
+  INDEX idx_chat_rooms_user2 (user2_id)
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  room_id VARCHAR(100) NOT NULL,
+  sender_id INT NOT NULL,
+  receiver_id INT NOT NULL,
+  message TEXT NOT NULL,
+  is_delivered TINYINT(1) DEFAULT 0,
+  is_seen TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_chat_messages_room (room_id),
+  INDEX idx_chat_messages_sender (sender_id),
+  INDEX idx_chat_messages_receiver (receiver_id)
+);
