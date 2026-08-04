@@ -58,18 +58,18 @@ exports.getSwipeFeed = async (req, res) => {
 
     const [countRows] = await db.query(
       `SELECT
-         SUM(action = 'like') AS likesToday,
-         SUM(action = 'superlike') AS superlikesToday
-       FROM swipes
-       WHERE user_id = ?
+         SUM(status = 'like') AS likesToday,
+         SUM(status = 'superlike') AS superlikesToday
+       FROM user_likes
+       WHERE liker_id = ?
          AND DATE(created_at) = CURDATE()`,
-      [userId]
+       [userId]
     );
 
     const likesToday = Number(countRows[0]?.likesToday || 0);
     const superlikesToday = Number(countRows[0]?.superlikesToday || 0);
 
-    // Haversine formula + a LEFT JOIN against `swipes` to know if this
+    // Haversine formula + a LEFT JOIN against `likes` to know if this
     // person already liked/superliked me (-> likesYou), and excludes anyone
     // I've already swiped on (like/pass/superlike) so the same profile
     // doesn't show up again.
@@ -80,23 +80,23 @@ exports.getSwipeFeed = async (req, res) => {
             cos(radians(?)) * cos(radians(u.lat)) * cos(radians(u.lng) - radians(?)) +
             sin(radians(?)) * sin(radians(u.lat))
          )) AS distance_km,
-         EXISTS(
-           SELECT 1 FROM swipes s
-           WHERE s.user_id = u.id AND s.target_user_id = ?
-             AND s.action IN ('like', 'superlike')
-         ) AS likes_you
+          EXISTS(
+            SELECT 1 FROM user_likes ul
+            WHERE ul.liker_id = u.id AND ul.likee_id = ?
+              AND ul.status IN ('like', 'superlike')
+          ) AS likes_you
        FROM users u
        WHERE u.id != ?
          AND u.is_otp_verified = 1
          AND u.lat IS NOT NULL
          AND u.lng IS NOT NULL
          AND u.id NOT IN (
-           SELECT target_user_id FROM swipes WHERE user_id = ?
-         )
+            SELECT likee_id FROM user_likes WHERE liker_id = ?
+          )
        AND u.id NOT IN (
            SELECT likee_id FROM user_likes
            WHERE liker_id = ?
-             AND status IN ('like', 'superlike')
+             AND status IN ('like', 'superlike', 'unlike')
          )
          AND u.gender = (CASE WHEN ? = 'female' THEN 'male' ELSE 'female' END)
          AND JSON_CONTAINS(u.interested_in, ?, '$')
@@ -185,10 +185,10 @@ exports.getMatches = async (req, res) => {
     const [rows] = await db.query(
       `SELECT u.*
        FROM users u
-       JOIN swipes s1 ON s1.target_user_id = u.id AND s1.user_id = ? AND s1.action IN ('like','superlike')
-       JOIN swipes s2 ON s2.user_id = u.id AND s2.target_user_id = ? AND s2.action IN ('like','superlike')
-       WHERE u.id != ?`,
-      [userId, userId, userId]
+        JOIN user_likes s1 ON s1.likee_id = u.id AND s1.liker_id = ? AND s1.status IN ('like','superlike')
+        JOIN user_likes s2 ON s2.liker_id = u.id AND s2.likee_id = ? AND s2.status IN ('like','superlike')
+        WHERE u.id != ?`,
+       [userId, userId, userId]
     );
 
     const matches = rows.map((row) => buildUserPayload(row));
@@ -219,16 +219,16 @@ exports.recordSwipeAction = async (req, res) => {
     }
 
     const [existingRows] = await db.query(
-      'SELECT action FROM swipes WHERE user_id = ? AND target_user_id = ?',
+      'SELECT status FROM user_likes WHERE liker_id = ? AND likee_id = ?',
       [userId, targetUserId]
     );
     const existingStatus = existingRows.length ? existingRows[0].action : null;
 
     await db.query(
-      `INSERT INTO swipes (user_id, target_user_id, action)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE action = VALUES(action), created_at = NOW()`,
-      [userId, targetUserId, action]
+      `INSERT INTO user_likes (liker_id, likee_id, status)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE status = VALUES(status), created_at = NOW()`,
+       [userId, targetUserId, action]
     );
 
     let matched = false;
@@ -264,7 +264,7 @@ exports.recordSwipeAction = async (req, res) => {
       }
 
       const [mutual] = await db.query(
-        `SELECT id FROM swipes WHERE user_id = ? AND target_user_id = ? AND action IN ('like','superlike')`,
+        `SELECT liker_id FROM user_likes WHERE liker_id = ? AND likee_id = ? AND status IN ('like','superlike')`,
         [targetUserId, userId]
       );
       if (mutual.length > 0 && !['like','superlike'].includes(existingStatus)) {
