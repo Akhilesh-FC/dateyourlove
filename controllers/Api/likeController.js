@@ -61,7 +61,7 @@ const DEFAULT_LIKE_LIMITS = { maxDailyLikes: 3, maxDailySuperlikes: 1 };
 async function getFreeUserLikeLimits() {
   try {
     const [rows] = await db.query(
-      `SELECT max_daily_likes AS maxDailyLikes, max_daily_superlikes AS maxDailySuperlikes
+      `SELECT id, type, max_daily_likes AS maxDailyLikes, max_daily_superlikes AS maxDailySuperlikes
        FROM like_limits
        WHERE type = 'free_user'
        LIMIT 1`
@@ -152,7 +152,7 @@ exports.toggleLike = async (req, res) => {
 
       if (action === 'like' && projectedLikes > limits.maxDailyLikes) {
         return res.status(403).json({
-          message: 'Daily like limit reached',
+          message: 'Daily like limit reached. Subscribe to continue liking profiles.',
           limitInfo: {
             ...limitInfo,
             likesToday: currentLikes,
@@ -166,7 +166,7 @@ exports.toggleLike = async (req, res) => {
 
       if (action === 'superlike' && projectedSuperlikes > limits.maxDailySuperlikes) {
         return res.status(403).json({
-          message: 'Daily superlike limit reached',
+          message: 'Daily superlike limit reached. Subscribe to continue liking profiles.',
           limitInfo: {
             ...limitInfo,
             superlikesToday: currentSuperlikes,
