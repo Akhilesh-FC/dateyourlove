@@ -94,7 +94,9 @@ exports.getSwipeFeed = async (req, res) => {
            SELECT target_user_id FROM swipes WHERE user_id = ?
          )
        AND u.id NOT IN (
-           SELECT likee_id FROM user_likes WHERE liker_id = ?
+           SELECT likee_id FROM user_likes
+           WHERE liker_id = ?
+             AND status IN ('like', 'superlike')
          )
          AND u.gender = (CASE WHEN ? = 'female' THEN 'male' ELSE 'female' END)
          AND JSON_CONTAINS(u.interested_in, ?, '$')

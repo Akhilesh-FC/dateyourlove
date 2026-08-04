@@ -220,6 +220,7 @@ exports.toggleLike = async (req, res) => {
         matched = true;
         const [meRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [likerId]);
         const myToken = meRows[0] ? meRows[0].fcm_token : null;
+        const targetToken = fcmToken;
 
         const matchPayload = {
           type: 'match',
