@@ -9,6 +9,7 @@ const upload = require('../../middleware/upload');
 const authMiddleware = require('../../middleware/authMiddleware');
 const likeController = require('../../controllers/Api/likeController');
 const swipeController = require('../../controllers/Api/swipeController');
+const exploreController = require('../../controllers/Api/exploreController');
 
 // Public routes
 router.post('/otp/send', userController.sendOtp);
@@ -38,4 +39,6 @@ router.patch('/updateprofile/me', authMiddleware, upload.array('photos_add', 10)
 router.post('/like', authMiddleware, likeController.toggleLike);
 router.get('/likelist', authMiddleware, likeController.getLikedUsers);
 router.get('/like/matches', authMiddleware, likeController.getMatches);
+router.get('/explore', authMiddleware, exploreController.exploreUsers);
+router.post('/explore', authMiddleware, exploreController.exploreUsersPost);
 module.exports = router;
