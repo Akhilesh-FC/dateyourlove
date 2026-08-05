@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Socket.IO Chat Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f6f8; }
+    .container { max-width: 900px; margin: 20px auto; padding: 20px; background: #fff; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.08); }
+    h1 { margin-top: 0; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .card { flex: 1 1 320px; background: #f9fafb; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; }
+    .card h2 { margin-top: 0; font-size: 18px; }
+    label { display: block; margin: 12px 0 6px; font-weight: bold; }
+    input[type=text], input[type=number], textarea, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+    button { margin-top: 12px; padding: 10px 14px; border: none; border-radius: 6px; background: #2563eb; color: white; cursor: pointer; transition: background .2s ease; }
+    button:hover { background: #1d4ed8; }
+    button.secondary { background: #64748b; }
+    .log-box { background: #0f172a; color: #f8fafc; min-height: 320px; overflow-y: auto; padding: 16px; border-radius: 10px; font-family: monospace; white-space: pre-wrap; }
+    .status { margin: 8px 0 16px; font-weight: bold; }
+    .footer { margin-top: 24px; font-size: 14px; color: #475569; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Socket.IO Chat Test Page</h1>
+    <p>Use this page to test socket events and see ack / incoming event logs in the console section.</p>
+
+    <div class="row">
+      <div class="card">
+        <h2>Connection</h2>
+        <label for="serverUrl">Socket Server URL</label>
+        <input id="serverUrl" type="text" value="http://localhost:3001" />
+
+        <label for="userId">Your User ID</label>
+        <input id="userId" type="text" placeholder="Enter your user ID" />
+
+        <button id="connectBtn">Connect</button>
+        <button id="disconnectBtn" class="secondary">Disconnect</button>
+
+        <div class="status" id="connectionStatus">Status: disconnected</div>
+      </div>
+
+      <div class="card">
+        <h2>Emit Events</h2>
+
+        <label for="joinUserId">Join userId</label>
+        <input id="joinUserId" type="text" placeholder="Same as your user ID" />
+        <button id="joinBtn">Emit join</button>
+
+        <label for="roomId">Room ID</label>
+        <input id="roomId" type="text" placeholder="room_2_5" />
+
+        <label for="receiverId">Receiver ID</label>
+        <input id="receiverId" type="text" placeholder="5" />
+
+        <label for="typingMode">Typing mode</label>
+        <select id="typingMode">
+          <option value="true">typing on</option>
+          <option value="false">typing off</option>
+        </select>
+        <button id="typingBtn">Emit typing</button>
+
+        <label for="messageText">Message</label>
+        <textarea id="messageText" rows="4" placeholder="Hello from socket test"></textarea>
+
+        <label for="imageUrl">Image URL</label>
+        <input id="imageUrl" type="text" placeholder="Optional image URL" />
+
+        <button id="sendBtn">Emit chat_message</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Console / Event logs</h2>
+      <div class="log-box" id="logBox"></div>
+      <button id="clearLogsBtn" class="secondary">Clear logs</button>
+    </div>
+
+    <div class="footer">
+      Open browser console to see socket connection details.
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    function initSocketTestPage() {
+      const connectBtn = document.getElementById('connectBtn');
+      const disconnectBtn = document.getElementById('disconnectBtn');
+      const joinBtn = document.getElementById('joinBtn');
+      const typingBtn = document.getElementById('typingBtn');
+      const sendBtn = document.getElementById('sendBtn');
+      const clearLogsBtn = document.getElementById('clearLogsBtn');
+      const statusEl = document.getElementById('connectionStatus');
+      const logBox = document.getElementById('logBox');
+
+      const serverUrlInput = document.getElementById('serverUrl');
+      const userIdInput = document.getElementById('userId');
+      const joinUserIdInput = document.getElementById('joinUserId');
+      const roomIdInput = document.getElementById('roomId');
+      const receiverIdInput = document.getElementById('receiverId');
+      const typingModeSelect = document.getElementById('typingMode');
+      const messageTextInput = document.getElementById('messageText');
+      const imageUrlInput = document.getElementById('imageUrl');
+
+      let socket = null;
+
+      function log(message) {
+        const time = new Date().toLocaleTimeString();
+        logBox.textContent += `[${time}] ${message}\n`;
+        logBox.scrollTop = logBox.scrollHeight;
+        console.log(message);
+      }
+
+      function setStatus(text) {
+        statusEl.textContent = `Status: ${text}`;
+      }
+
+      function createSocket() {
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+        }
+
+        const serverUrl = serverUrlInput.value.trim();
+        if (!serverUrl) {
+          alert('Enter socket server URL');
+          return;
+        }
+
+        if (typeof io !== 'function') {
+          alert('Socket.IO client library not loaded.');
+          return;
+        }
+
+        socket = io(serverUrl, { transports: ['websocket', 'polling'] });
+
+        socket.on('connect', () => {
+          setStatus('connected');
+          log(`socket connected: ${socket.id}`);
+        });
+
+        socket.on('disconnect', (reason) => {
+          setStatus('disconnected');
+          log(`socket disconnected: ${reason}`);
+        });
+
+        socket.on('connect_error', (err) => {
+          setStatus('connect error');
+          log(`connect error: ${err.message}`);
+        });
+
+        socket.on('message', (data) => {
+          log(`incoming message event: ${JSON.stringify(data)}`);
+        });
+
+        socket.on('message_status', (data) => {
+          log(`message_status event: ${JSON.stringify(data)}`);
+        });
+
+        socket.on('typing', (data) => {
+          log(`typing event: ${JSON.stringify(data)}`);
+        });
+
+        socket.on('presence', (data) => {
+          log(`presence event: ${JSON.stringify(data)}`);
+        });
+      }
+
+      connectBtn.addEventListener('click', createSocket);
+
+      disconnectBtn.addEventListener('click', () => {
+        if (!socket) return;
+        socket.disconnect();
+        setStatus('disconnected');
+        log('Socket disconnected by user');
+      });
+
+      joinBtn.addEventListener('click', () => {
+        if (!socket) {
+          alert('Connect first');
+          return;
+        }
+        const joinUserId = joinUserIdInput.value.trim() || userIdInput.value.trim();
+        if (!joinUserId) {
+          alert('Enter userId to join');
+          return;
+        }
+        socket.emit('join', { userId: joinUserId }, (response) => {
+          log(`join ack: ${JSON.stringify(response)}`);
+        });
+      });
+
+      typingBtn.addEventListener('click', () => {
+        if (!socket) {
+          alert('Connect first');
+          return;
+        }
+        const roomId = roomIdInput.value.trim();
+        const receiverId = receiverIdInput.value.trim();
+        const isTyping = typingModeSelect.value === 'true';
+        if (!roomId || !receiverId) {
+          alert('Enter roomId and receiverId');
+          return;
+        }
+        socket.emit('typing', { roomId, receiverId, isTyping }, (response) => {
+          log(`typing ack: ${JSON.stringify(response)}`);
+        });
+      });
+
+      sendBtn.addEventListener('click', () => {
+        if (!socket) {
+          alert('Connect first');
+          return;
+        }
+        const roomId = roomIdInput.value.trim();
+        const receiverId = receiverIdInput.value.trim();
+        const message = messageTextInput.value.trim();
+        const imageUrl = imageUrlInput.value.trim() || null;
+        if (!roomId || !receiverId || (!message && !imageUrl)) {
+          alert('Enter roomId, receiverId, and message or image URL');
+          return;
+        }
+        socket.emit('chat_message', { roomId, receiverId, message: message || null, imageUrl }, (response) => {
+          log(`chat_message ack: ${JSON.stringify(response)}`);
+        });
+      });
+
+      clearLogsBtn.addEventListener('click', () => {
+        logBox.textContent = '';
+      });
+    }
+
+    if (typeof io === 'undefined') {
+      const cdnScript = document.createElement('script');
+      cdnScript.src = 'https://cdn.jsdelivr.net/npm/socket.io-client@4/dist/socket.io.min.js';
+      cdnScript.onload = initSocketTestPage;
+      document.head.appendChild(cdnScript);
+    } else {
+      initSocketTestPage();
+    }
+  </script>
+</body>
+</html>
