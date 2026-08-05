@@ -5,7 +5,14 @@ const { calculateAge, toFullUrl } = require('../../utils/appHelpers');
 
 const MOBILE_REGEX = /^[0-9]{10}$/;
 const otpStore = new Map();
+const OTP_SEND_BASE_URL = process.env.OTP_SEND_URL || 'https://indopay.cloud/otp/newsend_otp.php';
+const OTP_VERIFY_BASE_URL = process.env.OTP_VERIFY_URL || 'https://indopay.cloud/otp/verifyotp.php';
 const getJwtSecret = () => process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? null : 'dev-secret-change-me');
+
+const buildOtpProviderUrl = (baseUrl, params) => {
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  return `${baseUrl}${separator}${new URLSearchParams(params).toString()}`;
+};
 
 // ---------- helpers ----------
 
@@ -63,7 +70,7 @@ const buildUserPayload = (row) => ({
   updated_at: row.updated_at,
 });
 
-const isMockOtpEnabled = () => process.env.OTP_MOCK === 'true' || process.env.NODE_ENV !== 'production';
+const isMockOtpEnabled = () => process.env.OTP_MOCK === 'true';
 
 const generateOtpCode = () => String(Math.floor(1000 + Math.random() * 9000));
 
@@ -135,7 +142,11 @@ exports.sendOtp = async (req, res) => {
       });
     }
 
-    const url = `https://indopay.cloud/otp/newsend_otp.php?merchant_key=${merchantKey}&mobile_no=${mobile}&digit=4`;
+    const url = buildOtpProviderUrl(OTP_SEND_BASE_URL, {
+      merchant_key: merchantKey,
+      mobile_no: mobile,
+      digit: 4,
+    });
     const response = await requestOtpProvider(url);
     if (!response.ok) {
       throw new Error(`OTP provider returned status ${response.status}: ${response.raw || 'No response body'}`);
@@ -511,7 +522,11 @@ exports.verifyOtp = async (req, res) => {
         return res.status(400).json({ message: 'Invalid OTP' });
       }
     } else {
-      const verifyUrl = `https://indopay.cloud/otp/verifyotp.php?merchant_key=${merchantKey}&mobile=${mobile}&otp=${otp}`;
+      const verifyUrl = buildOtpProviderUrl(OTP_VERIFY_BASE_URL, {
+        merchant_key: merchantKey,
+        mobile,
+        otp,
+      });
       const response = await requestOtpProvider(verifyUrl);
 
       if (!response.ok) {
