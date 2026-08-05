@@ -1,20 +1,18 @@
 # Chat API & Socket.IO Documentation
 
 ## Overview
-Yeh docs mobile frontend team ke liye hain. Yeh backend chat flow aur API endpoints describe karta hai: REST endpoints aur Socket.IO events.
+Yeh docs mobile frontend team ke liye hain. Backend chat flow mein REST endpoints aur Socket.IO events dono hain.
 
 ## Authentication
-- Har protected request mein header bhejno:
+- Har protected REST request mein send karo:
   - `Authorization: Bearer <token>`
-- JWT token ko mobile app mein safe store karo.
-- Example:
-  - `Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+- Socket events mein `join` pe `userId` bhejna zaroori hai.
 
 ## Base URLs
 - REST API base: `http://localhost:3001/api`
 - Socket server: `http://localhost:3001`
 
-> Note: Production mein yeh url change ho jayega. Jo mobile app use kare, woh correct host/prod URL se replace kare.
+> Production mein URL change hoga. Mobile app mein correct host/prod URL use karo.
 
 ---
 
@@ -31,14 +29,21 @@ Yeh docs mobile frontend team ke liye hain. Yeh backend chat flow aur API endpoi
     - `canReply`
     - `otherUserCanReply`
     - `isOnline`
-    - `createdAt`, `updatedAt`
+    - `createdAt`
+    - `updatedAt`
 
 ### 2) Get messages for a room
 - Endpoint: `GET /api/chat/messages/:roomId`
 - Auth: required
 - Example: `GET /api/chat/messages/room_2_5`
+- Query params:
+  - `page` (default `1`)
+  - `limit` (default `30`)
 - Response:
   - `roomId`
+  - `page`
+  - `limit`
+  - `total`
   - `canReply`
   - `messages[]`
     - `id`
@@ -52,14 +57,14 @@ Yeh docs mobile frontend team ke liye hain. Yeh backend chat flow aur API endpoi
     - `created_at`
     - `updated_at`
 
-### 3) Send message
-- Preferred: use Socket.IO event `chat_message`
-- Fallback: `POST /api/chat/send`
+### 3) Send message (fallback REST)
+- Preferred: use Socket.IO `chat_message` event
+- Fallback REST endpoint: `POST /api/chat/send`
 - Auth: required
-- Body (REST):
+- Body:
   - `roomId` (string)
   - `receiverId` (number)
-  - `message` (string, optional if `image_url` provided)
+  - `message` (string, optional if image present)
   - `image_url` (string, optional)
 - Example payload:
 ```json
@@ -81,11 +86,12 @@ Yeh docs mobile frontend team ke liye hain. Yeh backend chat flow aur API endpoi
 ### 4) Upload chat image
 - Endpoint: `POST /api/chat/upload-image`
 - Auth: required
-- Use `multipart/form-data` with field name `image`
+- Request type: `multipart/form-data`
+- Field name: `image`
 - Response:
   - `success`
-  - `image_url` (relative path)
-  - `full_url` (absolute delivered URL)
+  - `image_url`
+  - `full_url`
 
 ### 5) Mark delivered
 - Endpoint: `PATCH /api/chat/delivered/:messageId`
@@ -94,7 +100,7 @@ Yeh docs mobile frontend team ke liye hain. Yeh backend chat flow aur API endpoi
 - Response:
   - `message`: `Delivered updated`
 
-### 5) Mark seen
+### 6) Mark seen
 - Endpoint: `PATCH /api/chat/seen/:messageId`
 - Auth: required
 - Example: `PATCH /api/chat/seen/123`
@@ -111,32 +117,40 @@ Yeh docs mobile frontend team ke liye hain. Yeh backend chat flow aur API endpoi
 2. After connect, emit join:
    - `socket.emit('join', { userId: '<currentUserId>' });`
 
-### Socket events to use
+### Events
 - `typing`
-  - emitter payload:
+  - Send payload:
     - `roomId`
     - `receiverId`
     - `isTyping` (true/false)
-  - receiver payload:
+  - Receiver payload:
     - `roomId`
     - `senderId`
     - `isTyping`
+  - Callback response:
+    - `success`
+    - `message`
+    - `roomId`
+    - `receiverId`
+    - `isTyping`
+
 - `chat_message`
-  - send payload:
+  - Send payload:
     - `roomId`
     - `receiverId`
     - `message` (string, optional if `imageUrl` provided)
     - `imageUrl` (string, optional)
-  - callback response:
+  - Callback response:
     - `success`
     - `message`
     - `messageId`
     - `roomId`
     - `receiverHasPlan`
     - `delivered`
+
 - `message`
-  - fired when backend sends a new incoming chat message
-  - payload contains:
+  - Fired when backend sends a new incoming chat message
+  - Payload contains:
     - `id`
     - `room_id`
     - `sender_id`
@@ -149,15 +163,17 @@ Yeh docs mobile frontend team ke liye hain. Yeh backend chat flow aur API endpoi
     - `updated_at`
     - `roomId`
     - `receiverHasPlan`
+
 - `message_status`
-  - fired when delivered/seen status changes
-  - payload contains:
+  - Fired when delivered/seen status changes
+  - Payload contains:
     - `messageId`
     - `status` (`delivered` or `seen`)
     - `roomId`
+
 - `presence`
-  - fired when a user goes online/offline
-  - payload contains:
+  - Fired when a user goes online/offline
+  - Payload contains:
     - `userId`
     - `status` (`online` or `offline`)
 
@@ -167,10 +183,14 @@ const socket = io('http://localhost:3001');
 
 socket.on('connect', () => {
   console.log('connected', socket.id);
-  socket.emit('join', { userId: '2' });
+  socket.emit('join', { userId: '2' }, (response) => {
+    console.log('join response', response);
+  });
 });
 
-socket.emit('typing', { roomId: 'room_2_5', receiverId: 5, isTyping: true });
+socket.emit('typing', { roomId: 'room_2_5', receiverId: 5, isTyping: true }, (response) => {
+  console.log('typing response', response);
+});
 
 socket.emit('chat_message', {
   roomId: 'room_2_5',
@@ -217,12 +237,13 @@ socket.on('presence', (data) => {
    - call `GET /api/chat/messages/:roomId`
 
 5. **Send message**
-   - call `POST /api/chat/send`
+   - preferred: emit `chat_message`
+   - fallback: call `POST /api/chat/send`
    - backend stores message and emits `message` to receiver
 
 6. **Delivery**
    - if receiver online, backend updates `is_delivered = 1`
-   - frontend receives `message_status` with `delivered`
+   - sender receives `message_status` with `delivered`
 
 7. **Seen**
    - receiver calls `PATCH /api/chat/seen/:messageId`
@@ -245,10 +266,9 @@ socket.on('presence', (data) => {
 
 ## Notes for frontend team
 
-- `send` uses REST API, not direct socket emit.
-- Socket only receives live events.
-- If the app wants live message updates, keep socket connected and use `message` event.
-- If the app wants to sync older messages, use `GET /api/chat/messages/:roomId`.
+- Use socket for live chat and typing updates.
+- Use REST to fetch rooms, fetch chat history, upload images, and fallback send.
+- Keep the socket connected to receive `message`, `message_status`, `typing`, and `presence` events.
 
 ---
 

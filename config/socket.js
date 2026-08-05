@@ -19,21 +19,50 @@ function initSocket(server) {
   io.on('connection', (socket) => {
     console.log('socket connected', socket.id);
 
-    socket.on('join', ({ userId }) => {
+    socket.on('join', ({ userId }, callback) => {
+      if (!userId) {
+        if (typeof callback === 'function') {
+          return callback({ success: false, message: 'userId is required for join' });
+        }
+        return;
+      }
+
       const normalizedUserId = String(userId);
       socket.data.userId = normalizedUserId;
       socket.join(`user_${normalizedUserId}`);
       onlineUsers.set(normalizedUserId, socket.id);
       io.emit('presence', { userId: normalizedUserId, status: 'online' });
+
+      if (typeof callback === 'function') {
+        callback({ success: true, message: 'Joined successfully', userId: normalizedUserId });
+      }
     });
 
-    socket.on('typing', ({ roomId, receiverId, isTyping }) => {
-      if (!roomId || !receiverId) return;
+    socket.on('typing', ({ roomId, receiverId, isTyping }, callback) => {
+      const senderId = socket.data.userId;
+      if (!senderId) {
+        if (typeof callback === 'function') {
+          return callback({ success: false, message: 'You must join before sending typing events' });
+        }
+        return;
+      }
+
+      if (!roomId || !receiverId) {
+        if (typeof callback === 'function') {
+          return callback({ success: false, message: 'roomId and receiverId are required' });
+        }
+        return;
+      }
+
       io.to(`user_${receiverId}`).emit('typing', {
         roomId,
-        senderId: socket.data.userId,
+        senderId,
         isTyping: Boolean(isTyping),
       });
+
+      if (typeof callback === 'function') {
+        callback({ success: true, message: 'Typing event sent', roomId, receiverId, isTyping: Boolean(isTyping) });
+      }
     });
 
     socket.on('chat_message', async (data, callback) => {
