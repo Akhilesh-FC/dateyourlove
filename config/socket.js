@@ -1,4 +1,6 @@
 const { Server } = require('socket.io');
+const db = require('../config/db');
+const chatService = require('../services/chatService');
 let io = null;
 const onlineUsers = new Map();
 
@@ -7,7 +9,12 @@ const onlineUsers = new Map();
  * Call this once from server.js after the http server is created.
  */
 function initSocket(server) {
-  io = new Server(server);
+  io = new Server(server, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST'],
+    },
+  });
 
   io.on('connection', (socket) => {
     console.log('socket connected', socket.id);
@@ -20,14 +27,76 @@ function initSocket(server) {
       io.emit('presence', { userId: normalizedUserId, status: 'online' });
     });
 
-    socket.on('like', ({ fromId, toId }) => {
-      console.log(`like: ${fromId} -> ${toId}`);
-      io.to(`user_${toId}`).emit('liked', { fromId, toId });
+    socket.on('typing', ({ roomId, receiverId, isTyping }) => {
+      if (!roomId || !receiverId) return;
+      io.to(`user_${receiverId}`).emit('typing', {
+        roomId,
+        senderId: socket.data.userId,
+        isTyping: Boolean(isTyping),
+      });
     });
 
-    socket.on('message', ({ fromId, toId, text }) => {
-      console.log(`message from ${fromId} to ${toId}: ${text}`);
-      io.to(`user_${toId}`).emit('message', { fromId, toId, text });
+    socket.on('chat_message', async (data, callback) => {
+      try {
+        const senderId = Number(socket.data.userId);
+        if (!senderId) {
+          return typeof callback === 'function' && callback({ success: false, error: 'User not joined.' });
+        }
+
+        const { roomId, receiverId, message, imageUrl } = data || {};
+        if (!roomId || !receiverId || (!message && !imageUrl)) {
+          return typeof callback === 'function' && callback({ success: false, error: 'roomId, receiverId, and message or imageUrl are required.' });
+        }
+
+        const room = await chatService.getRoomForUser(roomId, senderId);
+        if (!room) {
+          return typeof callback === 'function' && callback({ success: false, error: 'Chat room not found or access denied.' });
+        }
+
+        const senderHasPlan = await chatService.userHasActiveSubscription(senderId);
+        if (!senderHasPlan) {
+          return typeof callback === 'function' && callback({ success: false, error: 'You need an active plan to send messages.' });
+        }
+
+        const receiverHasPlan = await chatService.userHasActiveSubscription(Number(receiverId));
+        const insertedMessage = await chatService.insertChatMessage({
+          roomId,
+          senderId,
+          receiverId: Number(receiverId),
+          message: message ? String(message) : null,
+          imageUrl: imageUrl ? String(imageUrl) : null,
+          isDelivered: 0,
+          isSeen: 0,
+        });
+
+        const isReceiverOnline = isUserOnline(Number(receiverId));
+        if (isReceiverOnline) {
+          await db.query(`UPDATE chat_messages SET is_delivered = 1 WHERE id = ?`, [insertedMessage.id]);
+          insertedMessage.is_delivered = 1;
+          io.to(`user_${senderId}`).emit('message_status', {
+            messageId: insertedMessage.id,
+            status: 'delivered',
+            roomId,
+          });
+        }
+
+        io.to(`user_${receiverId}`).emit('message', {
+          ...insertedMessage,
+          receiverHasPlan,
+        });
+
+        return typeof callback === 'function' && callback({
+          success: true,
+          message: 'Message sent',
+          delivered: isReceiverOnline,
+          messageId: insertedMessage.id,
+          roomId,
+          receiverHasPlan,
+        });
+      } catch (err) {
+        console.error('SOCKET CHAT MESSAGE ERROR:', err);
+        return typeof callback === 'function' && callback({ success: false, error: err.message || 'Unable to send message' });
+      }
     });
 
     socket.on('disconnect', () => {

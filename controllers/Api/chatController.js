@@ -1,6 +1,7 @@
 const db = require('../../config/db');
 const { buildUserPayload } = require('../../controllers/Api/userController');
 const { getIo, isUserOnline } = require('../../config/socket');
+const chatService = require('../../services/chatService');
 
 async function userHasActiveSubscription(userId) {
   const [rows] = await db.query(
@@ -126,28 +127,28 @@ exports.getChatMessages = async (req, res) => {
   try {
     const userId = req.user.id;
     const { roomId } = req.params;
+    const page = req.query.page || 1;
+    const limit = req.query.limit || 30;
 
-    const [roomRows] = await db.query(
-      `SELECT room_id, user1_id, user2_id FROM chat_rooms WHERE room_id = ? LIMIT 1`,
-      [roomId]
-    );
-
-    if (!roomRows.length) {
-      return res.status(404).json({ message: 'Chat room not found' });
+    const room = await chatService.getRoomForUser(roomId, userId);
+    if (!room) {
+      return res.status(404).json({ message: 'Chat room not found or access denied' });
     }
 
-    const room = roomRows[0];
-    if (room.user1_id !== userId && room.user2_id !== userId) {
-      return res.status(403).json({ message: 'Access denied' });
+    const hasActivePlan = await chatService.userHasActiveSubscription(userId);
+    if (!hasActivePlan) {
+      return res.status(403).json({ message: 'You need an active plan to view chat messages.' });
     }
 
-    const [messageRows] = await db.query(
-      `SELECT * FROM chat_messages WHERE room_id = ? ORDER BY created_at ASC`,
-      [roomId]
-    );
-
-    const canReply = await userHasActiveSubscription(userId);
-    return res.status(200).json({ roomId, canReply, messages: messageRows });
+    const history = await chatService.getChatMessagesByRoom(roomId, page, limit);
+    return res.status(200).json({
+      roomId,
+      page: history.page,
+      limit: history.limit,
+      total: history.total,
+      canReply: true,
+      messages: history.messages,
+    });
   } catch (err) {
     console.error('GET CHAT MESSAGES ERROR:', err.message);
     return res.status(500).json({ message: 'Unable to fetch messages' });
@@ -158,77 +159,80 @@ exports.sendMessage = async (req, res) => {
   try {
     const senderId = req.user.id;
     const { roomId, receiverId, message } = req.body;
+    const imageUrl = req.body.image_url || req.body.imageUrl || null;
 
-    if (!roomId || !receiverId || !message) {
-      return res.status(400).json({ message: 'roomId, receiverId and message are required' });
+    if (!roomId || !receiverId || (!message && !imageUrl)) {
+      return res.status(400).json({ message: 'roomId, receiverId and message or image_url are required' });
     }
 
-    const [roomRows] = await db.query(
-      `SELECT room_id, user1_id, user2_id FROM chat_rooms WHERE room_id = ? LIMIT 1`,
-      [roomId]
-    );
-
-    if (!roomRows.length) {
-      return res.status(404).json({ message: 'Chat room not found' });
+    const room = await chatService.getRoomForUser(roomId, senderId);
+    if (!room) {
+      return res.status(404).json({ message: 'Chat room not found or access denied' });
     }
 
-    const room = roomRows[0];
-    if (room.user1_id !== senderId && room.user2_id !== senderId) {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
-    const senderHasPlan = await userHasActiveSubscription(senderId);
+    const senderHasPlan = await chatService.userHasActiveSubscription(senderId);
     if (!senderHasPlan) {
       return res.status(403).json({ message: 'You need an active plan to send messages.' });
     }
 
-    const receiverHasPlan = await userHasActiveSubscription(Number(receiverId));
-    const canReply = receiverHasPlan;
-
-    const insertedMessage = {
-      room_id: roomId,
-      sender_id: senderId,
-      receiver_id: Number(receiverId),
-      message: String(message),
-      is_delivered: 0,
-      is_seen: 0,
-    };
-
-    const [result] = await db.query(
-      `INSERT INTO chat_messages (room_id, sender_id, receiver_id, message, is_delivered, is_seen)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [insertedMessage.room_id, insertedMessage.sender_id, insertedMessage.receiver_id, insertedMessage.message, insertedMessage.is_delivered, insertedMessage.is_seen]
-    );
+    const receiverHasPlan = await chatService.userHasActiveSubscription(Number(receiverId));
+    const insertedMessage = await chatService.insertChatMessage({
+      roomId,
+      senderId,
+      receiverId: Number(receiverId),
+      message: message ? String(message) : null,
+      imageUrl: imageUrl ? String(imageUrl) : null,
+      isDelivered: 0,
+      isSeen: 0,
+    });
 
     const io = getIo();
     const payload = {
+      ...insertedMessage,
       roomId,
-      messageId: result.insertId,
-      senderId,
-      receiverId: Number(receiverId),
-      message: insertedMessage.message,
-      canReply,
-      sentAt: new Date().toISOString(),
+      receiverHasPlan,
     };
 
+    let delivered = false;
     if (io) {
       io.to(`user_${receiverId}`).emit('message', payload);
       if (isUserOnline(Number(receiverId))) {
-        await db.query(`UPDATE chat_messages SET is_delivered = 1 WHERE id = ?`, [result.insertId]);
-        io.to(`user_${senderId}`).emit('message_status', { messageId: result.insertId, status: 'delivered', roomId });
+        await db.query(`UPDATE chat_messages SET is_delivered = 1 WHERE id = ?`, [insertedMessage.id]);
+        delivered = true;
+        io.to(`user_${senderId}`).emit('message_status', {
+          messageId: insertedMessage.id,
+          status: 'delivered',
+          roomId,
+        });
       }
     }
 
     return res.status(200).json({
+      success: true,
       message: 'Message sent',
-      messageId: result.insertId,
+      messageId: insertedMessage.id,
       roomId,
-      canReply,
-      delivered: isUserOnline(Number(receiverId)),
+      receiverHasPlan,
+      delivered,
+      payload,
     });
   } catch (err) {
     console.error('SEND CHAT MESSAGE ERROR:', err.message);
     return res.status(500).json({ message: 'Unable to send message' });
+  }
+};
+
+exports.uploadChatImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Image file is required' });
+    }
+
+    const imageUrl = `/uploads/photos/${req.file.filename}`;
+    return res.status(200).json({ success: true, image_url: imageUrl, full_url: `${process.env.BASE_URL || 'http://localhost:3001'}${imageUrl}` });
+  } catch (err) {
+    console.error('UPLOAD CHAT IMAGE ERROR:', err.message);
+    return res.status(500).json({ message: 'Unable to upload image' });
   }
 };
 
@@ -237,14 +241,32 @@ exports.markMessageDelivered = async (req, res) => {
     const userId = req.user.id;
     const { messageId } = req.params;
 
+    const [rows] = await db.query(
+      `SELECT sender_id, receiver_id, room_id FROM chat_messages WHERE id = ? LIMIT 1`,
+      [messageId]
+    );
+
+    if (!rows.length || Number(rows[0].receiver_id) !== Number(userId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const receiverHasPlan = await chatService.userHasActiveSubscription(userId);
+    if (!receiverHasPlan) {
+      return res.status(403).json({ message: 'You need an active plan to mark messages as delivered.' });
+    }
+
     await db.query(
-      `UPDATE chat_messages SET is_delivered = 1 WHERE id = ? AND receiver_id = ?`,
-      [messageId, userId]
+      `UPDATE chat_messages SET is_delivered = 1 WHERE id = ?`,
+      [messageId]
     );
 
     const io = getIo();
     if (io) {
-      io.to(`user_${userId}`).emit('message_status', { messageId, status: 'delivered' });
+      io.to(`user_${rows[0].sender_id}`).emit('message_status', {
+        messageId,
+        status: 'delivered',
+        roomId: rows[0].room_id,
+      });
     }
 
     return res.status(200).json({ message: 'Delivered updated' });
@@ -259,14 +281,32 @@ exports.markMessageSeen = async (req, res) => {
     const userId = req.user.id;
     const { messageId } = req.params;
 
+    const [rows] = await db.query(
+      `SELECT sender_id, receiver_id, room_id FROM chat_messages WHERE id = ? LIMIT 1`,
+      [messageId]
+    );
+
+    if (!rows.length || Number(rows[0].receiver_id) !== Number(userId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const receiverHasPlan = await chatService.userHasActiveSubscription(userId);
+    if (!receiverHasPlan) {
+      return res.status(403).json({ message: 'You need an active plan to mark messages as seen.' });
+    }
+
     await db.query(
-      `UPDATE chat_messages SET is_seen = 1 WHERE id = ? AND receiver_id = ?`,
-      [messageId, userId]
+      `UPDATE chat_messages SET is_seen = 1 WHERE id = ?`,
+      [messageId]
     );
 
     const io = getIo();
     if (io) {
-      io.to(`user_${userId}`).emit('message_status', { messageId, status: 'seen' });
+      io.to(`user_${rows[0].sender_id}`).emit('message_status', {
+        messageId,
+        status: 'seen',
+        roomId: rows[0].room_id,
+      });
     }
 
     return res.status(200).json({ message: 'Seen updated' });

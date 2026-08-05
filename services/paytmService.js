@@ -5,13 +5,19 @@ const PaytmChecksum = require('paytmchecksum');
 const MID = process.env.PAYTM_MID;
 const MERCHANT_KEY = process.env.PAYTM_MERCHANT_KEY;
 const WEBSITE = process.env.PAYTM_WEBSITE || 'WEBSTAGING';
-const CALLBACK_URL = process.env.PAYTM_CALLBACK_URL; // e.g., https://your-domain.com/api/paytm/webhook
 
-// FIX: is MID ke liye Paytm ka gateway "paytmpayments.com" domain hai,
-// "paytm.in" NAHI. Working project isi domain se hit karta hai.
-const INITIATE_URL = process.env.PAYTM_ENV === 'PROD'
+const PAYTM_ENV = String(process.env.PAYTM_ENV || '').toLowerCase();
+const isProd = PAYTM_ENV === 'prod' || PAYTM_ENV === 'production';
+const INITIATE_URL = isProd
   ? 'https://secure.paytmpayments.com/theia/api/v1/initiateTransaction'
   : 'https://securestage.paytmpayments.com/theia/api/v1/initiateTransaction';
+
+const CALLBACK_URL = process.env.PAYTM_CALLBACK_URL ||
+  `${process.env.BASE_URL || 'http://localhost:3001'}/api/subscription/paytm/webhook`;
+
+if (!process.env.PAYTM_CALLBACK_URL) {
+  console.warn('PAYTM_CALLBACK_URL is not set. Using fallback callback URL:', CALLBACK_URL);
+}
 
 async function generateSignature(body) {
   try {
