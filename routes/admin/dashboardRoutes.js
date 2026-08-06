@@ -4,9 +4,9 @@
 const express = require('express');
 const router = express.Router();
 
-const adminController = require('../../controllers/admin/adminController');
-const productAdminController = require('../../controllers/admin/productAdminController');
-// const comboAdminController = require('../../controllers/admin/comboOfferAdminController'); // removed - not used
+const adminController = require('../../controllers/Admin/adminController');
+const productAdminController = require('../../controllers/Admin/productAdminController');
+// const comboAdminController = require('../../controllers/Admin/comboOfferAdminController'); // removed - not used
 const auth = require('../../middleware/auth');
 const upload = require('../../middleware/upload'); // multer config for file uploads
 
