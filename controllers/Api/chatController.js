@@ -72,6 +72,60 @@ exports.ensureChatRoomForUsers = async (user1Id, user2Id) => {
   }
 };
 
+async function buildRoomSummary(roomId, userId) {
+  // returns the same shape as in GET /api/chat/rooms for a single room
+  const [roomRows] = await db.query(
+    `SELECT room_id, user1_id, user2_id, created_at, updated_at
+     FROM chat_rooms WHERE room_id = ? LIMIT 1`,
+    [roomId]
+  );
+  if (!roomRows.length) return null;
+  const roomRow = roomRows[0];
+  const otherUserId = Number(roomRow.user1_id) === Number(userId) ? Number(roomRow.user2_id) : Number(roomRow.user1_id);
+
+  const [userRows] = await db.query(
+    `SELECT * FROM users WHERE id = ? LIMIT 1`,
+    [otherUserId]
+  );
+  const otherUser = userRows.length ? buildUserPayload(userRows[0]) : null;
+
+  const [canReplyRows] = await db.query(
+    `SELECT COUNT(*) AS count
+     FROM user_subscriptions
+     WHERE user_id = ?
+       AND status = 'active'
+       AND start_date <= CURDATE()
+       AND end_date >= CURDATE()`,
+    [userId]
+  );
+  const canReply = Number(canReplyRows[0]?.count || 0) > 0;
+  const otherUserCanReply = await userHasActiveSubscription(otherUserId);
+
+  const [unreadRows] = await db.query(
+    `SELECT COUNT(*) AS unread_count FROM chat_messages WHERE room_id = ? AND is_seen = 0`,
+    [roomId]
+  );
+  const unreadCount = Number(unreadRows[0]?.unread_count || 0);
+
+  const [lastRows] = await db.query(
+    `SELECT * FROM chat_messages WHERE room_id = ? ORDER BY id DESC LIMIT 1`,
+    [roomId]
+  );
+  const lastMessage = lastRows.length ? chatService.formatChatMessages(lastRows)[0] : null;
+
+  return {
+    roomId: roomRow.room_id,
+    otherUser,
+    canReply,
+    otherUserCanReply,
+    isOnline: isUserOnline(otherUserId),
+    createdAt: roomRow.created_at,
+    updatedAt: roomRow.updated_at,
+    unreadCount,
+    lastMessage,
+  };
+}
+
 exports.getChatRooms = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -241,6 +295,15 @@ exports.sendMessage = async (req, res) => {
           status: 'delivered',
           roomId,
         });
+      }
+      try {
+        // Emit updated room summary to both participants so clients can update room lists
+        const summaryForReceiver = await buildRoomSummary(roomId, Number(receiverId));
+        const summaryForSender = await buildRoomSummary(roomId, Number(senderId));
+        if (summaryForReceiver) io.to(`user_${receiverId}`).emit('room_update', summaryForReceiver);
+        if (summaryForSender) io.to(`user_${senderId}`).emit('room_update', summaryForSender);
+      } catch (emitErr) {
+        console.error('ROOM UPDATE EMIT ERROR:', emitErr && emitErr.message ? emitErr.message : emitErr);
       }
     }
 
