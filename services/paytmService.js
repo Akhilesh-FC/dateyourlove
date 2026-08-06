@@ -35,7 +35,7 @@ async function generateSignature(body) {
 async function verifyChecksum(body, checksum) {
   try {
     const isValid = await PaytmChecksum.verifySignature(
-      JSON.stringify(body),
+      body,
       MERCHANT_KEY,
       checksum
     );
