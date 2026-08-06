@@ -31,6 +31,18 @@ Yeh docs mobile frontend team ke liye hain. Backend chat flow mein REST endpoint
     - `isOnline`
     - `createdAt`
     - `updatedAt`
+    - `unreadCount`
+    - `lastMessage`
+      - `id`
+      - `room_id`
+      - `sender_id`
+      - `receiver_id`
+      - `message`
+      - `image_url`
+      - `is_delivered`
+      - `is_seen`
+      - `created_at`
+      - `updated_at`
 
 ### 2) Get messages for a room
 - Endpoint: `GET /api/chat/messages/:roomId`

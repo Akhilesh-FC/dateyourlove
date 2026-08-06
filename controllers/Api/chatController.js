@@ -90,6 +90,41 @@ exports.getChatRooms = async (req, res) => {
       [userId, userId, userId]
     );
 
+    const roomIds = rows.map((row) => row.room_id);
+    const unreadCounts = new Map();
+    const lastMessages = new Map();
+
+    if (roomIds.length) {
+      const [unreadRows] = await db.query(
+        `SELECT room_id, COUNT(*) AS unread_count
+         FROM chat_messages
+         WHERE room_id IN (?)
+           AND receiver_id = ?
+           AND is_seen = 0
+         GROUP BY room_id`,
+        [roomIds, userId]
+      );
+      for (const row of unreadRows) {
+        unreadCounts.set(row.room_id, Number(row.unread_count || 0));
+      }
+
+      const [lastMessageRows] = await db.query(
+        `SELECT cm.*
+         FROM chat_messages cm
+         JOIN (
+           SELECT room_id, MAX(id) AS max_id
+           FROM chat_messages
+           WHERE room_id IN (?)
+           GROUP BY room_id
+         ) latest ON cm.room_id = latest.room_id AND cm.id = latest.max_id`,
+        [roomIds]
+      );
+      const formattedLastMessages = chatService.formatChatMessages(lastMessageRows);
+      for (const message of formattedLastMessages) {
+        lastMessages.set(message.room_id, message);
+      }
+    }
+
     const rooms = [];
     for (const row of rows) {
       const otherUserId = Number(row.user1_id) === Number(userId) ? Number(row.user2_id) : Number(row.user1_id);
@@ -113,6 +148,8 @@ exports.getChatRooms = async (req, res) => {
         isOnline: isUserOnline(otherUserId),
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        unreadCount: unreadCounts.get(row.room_id) || 0,
+        lastMessage: lastMessages.get(row.room_id) || null,
       });
     }
 
