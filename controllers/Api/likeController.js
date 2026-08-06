@@ -257,11 +257,12 @@ exports.toggleLike = async (req, res) => {
 exports.getLikedUsers = async (req, res) => {
   try {
     const likerId = req.user.id;
+    const isPlanActive = await userHasActiveSubscription(likerId);
     // fetch liked user ids
     const [likeRows] = await db.query('SELECT likee_id FROM user_likes WHERE liker_id = ? AND status = ?', [likerId, "like"]);
     const likeeIds = likeRows.map(r => r.likee_id);
     if (likeeIds.length === 0) {
-      return res.status(200).json({ likedUsers: [] });
+      return res.status(200).json({ likedUsers: [], isPlanActive });
     }
     // fetch user details
     const placeholders = likeeIds.map(() => '?').join(',');
@@ -278,7 +279,7 @@ exports.getLikedUsers = async (req, res) => {
       profile.photos = photosByUser[u.id] || [];
       return profile;
     });
-    return res.status(200).json({ likedUsers: likedProfiles });
+    return res.status(200).json({ likedUsers: likedProfiles, isPlanActive });
   } catch (err) {
     console.error('GET LIKED USERS ERROR:', err);
     return res.status(500).json({ message: 'Unable to fetch liked users', error: err.message });
