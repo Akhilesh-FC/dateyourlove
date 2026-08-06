@@ -73,67 +73,6 @@ exports.ensureChatRoomForUsers = async (user1Id, user2Id) => {
   }
 };
 
-async function buildRoomSummary(roomId, userId) {
-  // returns the same shape as in GET /api/chat/rooms for a single room
-  const [roomRows] = await db.query(
-    `SELECT room_id, user1_id, user2_id, created_at, updated_at
-     FROM chat_rooms WHERE room_id = ? LIMIT 1`,
-    [roomId]
-  );
-  if (!roomRows.length) return null;
-  const roomRow = roomRows[0];
-  const otherUserId = Number(roomRow.user1_id) === Number(userId) ? Number(roomRow.user2_id) : Number(roomRow.user1_id);
-
-  const [userRows] = await db.query(
-    `SELECT * FROM users WHERE id = ? LIMIT 1`,
-    [otherUserId]
-  );
-  const otherUser = userRows.length ? buildUserPayload(userRows[0]) : null;
-  if (otherUser) {
-    const [photoRows] = await db.query(
-      'SELECT id, url FROM user_photos WHERE user_id = ? ORDER BY is_required DESC, id ASC',
-      [otherUserId]
-    );
-    otherUser.images = photoRows.map((p) => toFullUrl(p.url));
-  }
-
-  const [canReplyRows] = await db.query(
-    `SELECT COUNT(*) AS count
-     FROM user_subscriptions
-     WHERE user_id = ?
-       AND status = 'active'
-       AND start_date <= CURDATE()
-       AND end_date >= CURDATE()`,
-    [userId]
-  );
-  const canReply = Number(canReplyRows[0]?.count || 0) > 0;
-  const otherUserCanReply = await userHasActiveSubscription(otherUserId);
-
-  const [unreadRows] = await db.query(
-    `SELECT COUNT(*) AS unread_count FROM chat_messages WHERE room_id = ? AND is_seen = 0`,
-    [roomId]
-  );
-  const unreadCount = Number(unreadRows[0]?.unread_count || 0);
-
-  const [lastRows] = await db.query(
-    `SELECT * FROM chat_messages WHERE room_id = ? ORDER BY id DESC LIMIT 1`,
-    [roomId]
-  );
-  const lastMessage = lastRows.length ? chatService.formatChatMessages(lastRows)[0] : null;
-
-  return {
-    roomId: roomRow.room_id,
-    otherUser,
-    canReply,
-    otherUserCanReply,
-    isOnline: isUserOnline(otherUserId),
-    createdAt: roomRow.created_at,
-    updatedAt: roomRow.updated_at,
-    unreadCount,
-    lastMessage,
-  };
-}
-
 exports.getChatRooms = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -141,14 +80,20 @@ exports.getChatRooms = async (req, res) => {
     const [rows] = await db.query(
       `SELECT cr.room_id, cr.user1_id, cr.user2_id, cr.created_at, cr.updated_at,
               u.id, u.first_name, u.about, u.gender, u.dob, u.email, u.mobile,
-              u.created_at AS user_created_at, u.updated_at AS user_updated_at
+              u.created_at AS user_created_at, u.updated_at AS user_updated_at,
+              COALESCE(lm.last_message_at, cr.updated_at) AS last_activity_at
        FROM chat_rooms cr
+       LEFT JOIN (
+         SELECT room_id, MAX(created_at) AS last_message_at
+         FROM chat_messages
+         GROUP BY room_id
+       ) lm ON lm.room_id = cr.room_id
        JOIN users u ON u.id = CASE
          WHEN cr.user1_id = ? THEN cr.user2_id
          ELSE cr.user1_id
        END
        WHERE cr.user1_id = ? OR cr.user2_id = ?
-       ORDER BY cr.updated_at DESC`,
+       ORDER BY last_activity_at DESC`,
       [userId, userId, userId]
     );
 
@@ -223,6 +168,12 @@ exports.getChatRooms = async (req, res) => {
         lastMessage: lastMessages.get(row.room_id) || null,
       });
     }
+
+    rooms.sort((a, b) => {
+      const aTime = a.lastMessage?.created_at || a.updatedAt;
+      const bTime = b.lastMessage?.created_at || b.updatedAt;
+      return new Date(bTime) - new Date(aTime);
+    });
 
     return res.status(200).json({ count: rooms.length, rooms });
   } catch (err) {
@@ -315,8 +266,8 @@ exports.sendMessage = async (req, res) => {
       }
       try {
         // Emit updated room summary to both participants so clients can update room lists
-        const summaryForReceiver = await buildRoomSummary(roomId, Number(receiverId));
-        const summaryForSender = await buildRoomSummary(roomId, Number(senderId));
+        const summaryForReceiver = await chatService.buildRoomSummary(roomId, Number(receiverId));
+        const summaryForSender = await chatService.buildRoomSummary(roomId, Number(senderId));
         if (summaryForReceiver) io.to(`user_${receiverId}`).emit('room_update', summaryForReceiver);
         if (summaryForSender) io.to(`user_${senderId}`).emit('room_update', summaryForSender);
       } catch (emitErr) {

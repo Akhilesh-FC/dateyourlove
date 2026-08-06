@@ -114,6 +114,21 @@ function initSocket(server) {
           receiverHasPlan,
         });
 
+        try {
+          const summaryForReceiver = await chatService.buildRoomSummary(roomId, Number(receiverId));
+          const summaryForSender = await chatService.buildRoomSummary(roomId, Number(senderId));
+          if (summaryForReceiver) {
+            summaryForReceiver.isOnline = isUserOnline(senderId);
+            io.to(`user_${receiverId}`).emit('room_update', summaryForReceiver);
+          }
+          if (summaryForSender) {
+            summaryForSender.isOnline = isUserOnline(receiverId);
+            io.to(`user_${senderId}`).emit('room_update', summaryForSender);
+          }
+        } catch (emitErr) {
+          console.error('ROOM UPDATE EMIT ERROR:', emitErr && emitErr.message ? emitErr.message : emitErr);
+        }
+
         return typeof callback === 'function' && callback({
           success: true,
           message: 'Message sent',

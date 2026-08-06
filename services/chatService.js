@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { toFullUrl } = require('../utils/appHelpers');
+const { buildUserPayload } = require('../controllers/Api/userController');
 
 async function userHasActiveSubscription(userId) {
   const [rows] = await db.query(
@@ -28,6 +29,70 @@ async function getRoomForUser(roomId, userId) {
     return null;
   }
   return room;
+}
+
+async function buildRoomSummary(roomId, userId) {
+  const [roomRows] = await db.query(
+    `SELECT room_id, user1_id, user2_id, created_at, updated_at
+     FROM chat_rooms WHERE room_id = ? LIMIT 1`,
+    [roomId]
+  );
+  if (!roomRows.length) return null;
+
+  const roomRow = roomRows[0];
+  const otherUserId = Number(roomRow.user1_id) === Number(userId)
+    ? Number(roomRow.user2_id)
+    : Number(roomRow.user1_id);
+
+  const [userRows] = await db.query(
+    `SELECT * FROM users WHERE id = ? LIMIT 1`,
+    [otherUserId]
+  );
+  const otherUser = userRows.length ? buildUserPayload(userRows[0]) : null;
+
+  if (otherUser) {
+    const [photoRows] = await db.query(
+      'SELECT id, url FROM user_photos WHERE user_id = ? ORDER BY is_required DESC, id ASC',
+      [otherUserId]
+    );
+    otherUser.images = photoRows.map((p) => toFullUrl(p.url));
+  }
+
+  const [canReplyRows] = await db.query(
+    `SELECT COUNT(*) AS count
+     FROM user_subscriptions
+     WHERE user_id = ?
+       AND status = 'active'
+       AND start_date <= CURDATE()
+       AND end_date >= CURDATE()`,
+    [userId]
+  );
+  const canReply = Number(canReplyRows[0]?.count || 0) > 0;
+  const otherUserCanReply = await userHasActiveSubscription(otherUserId);
+
+  const [unreadRows] = await db.query(
+    `SELECT COUNT(*) AS unread_count FROM chat_messages WHERE room_id = ? AND is_seen = 0`,
+    [roomId]
+  );
+  const unreadCount = Number(unreadRows[0]?.unread_count || 0);
+
+  const [lastRows] = await db.query(
+    `SELECT * FROM chat_messages WHERE room_id = ? ORDER BY id DESC LIMIT 1`,
+    [roomId]
+  );
+  const lastMessage = lastRows.length ? formatChatMessages(lastRows)[0] : null;
+
+  return {
+    roomId: roomRow.room_id,
+    otherUser,
+    canReply,
+    otherUserCanReply,
+    isOnline: false,
+    createdAt: roomRow.created_at,
+    updatedAt: roomRow.updated_at,
+    unreadCount,
+    lastMessage,
+  };
 }
 
 async function getChatMessagesByRoom(roomId, page = 1, limit = 20) {
@@ -85,6 +150,7 @@ function formatChatMessages(rows) {
 module.exports = {
   userHasActiveSubscription,
   getRoomForUser,
+  buildRoomSummary,
   getChatMessagesByRoom,
   insertChatMessage,
   formatChatMessages,

@@ -162,6 +162,10 @@
           log(`typing event: ${JSON.stringify(data)}`);
         });
 
+        socket.on('room_update', (data) => {
+          log(`room_update event: ${JSON.stringify(data)}`);
+        });
+
         socket.on('presence', (data) => {
           log(`presence event: ${JSON.stringify(data)}`);
         });
