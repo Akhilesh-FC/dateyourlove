@@ -95,14 +95,15 @@ exports.getChatRooms = async (req, res) => {
     const lastMessages = new Map();
 
     if (roomIds.length) {
+      const placeholders = roomIds.map(() => '?').join(',');
       const [unreadRows] = await db.query(
         `SELECT room_id, COUNT(*) AS unread_count
          FROM chat_messages
-         WHERE room_id IN (?)
+         WHERE room_id IN (${placeholders})
            AND receiver_id = ?
            AND is_seen = 0
          GROUP BY room_id`,
-        [roomIds, userId]
+        [...roomIds, userId]
       );
       for (const row of unreadRows) {
         unreadCounts.set(row.room_id, Number(row.unread_count || 0));
@@ -114,10 +115,10 @@ exports.getChatRooms = async (req, res) => {
          JOIN (
            SELECT room_id, MAX(id) AS max_id
            FROM chat_messages
-           WHERE room_id IN (?)
+           WHERE room_id IN (${placeholders})
            GROUP BY room_id
          ) latest ON cm.room_id = latest.room_id AND cm.id = latest.max_id`,
-        [roomIds]
+        roomIds
       );
       const formattedLastMessages = chatService.formatChatMessages(lastMessageRows);
       for (const message of formattedLastMessages) {
