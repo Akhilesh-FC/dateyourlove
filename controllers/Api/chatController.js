@@ -1,5 +1,6 @@
 const db = require('../../config/db');
 const { buildUserPayload } = require('../../controllers/Api/userController');
+const { toFullUrl } = require('../../utils/appHelpers');
 const { getIo, isUserOnline } = require('../../config/socket');
 const chatService = require('../../services/chatService');
 
@@ -88,6 +89,13 @@ async function buildRoomSummary(roomId, userId) {
     [otherUserId]
   );
   const otherUser = userRows.length ? buildUserPayload(userRows[0]) : null;
+  if (otherUser) {
+    const [photoRows] = await db.query(
+      'SELECT id, url FROM user_photos WHERE user_id = ? ORDER BY is_required DESC, id ASC',
+      [otherUserId]
+    );
+    otherUser.images = photoRows.map((p) => toFullUrl(p.url));
+  }
 
   const [canReplyRows] = await db.query(
     `SELECT COUNT(*) AS count
@@ -194,6 +202,15 @@ exports.getChatRooms = async (req, res) => {
       const canReply = Number(canReplyRows[0]?.count || 0) > 0;
       const otherUserCanReply = await userHasActiveSubscription(otherUserId);
       const otherUser = buildUserPayload(row);
+      try {
+        const [photoRows] = await db.query(
+          'SELECT id, url FROM user_photos WHERE user_id = ? ORDER BY is_required DESC, id ASC',
+          [otherUserId]
+        );
+        otherUser.images = photoRows.map((p) => toFullUrl(p.url));
+      } catch (photoErr) {
+        otherUser.images = [];
+      }
       rooms.push({
         roomId: row.room_id,
         otherUser,
