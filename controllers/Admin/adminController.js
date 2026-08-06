@@ -77,16 +77,16 @@ exports.dashboard = async (req, res) => {
       value: Number(row.count || 0),
     }));
 
-    return res.render('administrator/dashboard', { admin: req.session.admin, stats, chartData });
+    return res.render('administrator/dashboard', { admin: req.session.admin, stats, chartData, activePage: 'dashboard' });
   } catch (err) {
     console.error('Admin dashboard error:', err);
     const stats = { users: 0, activePlans: 0, inactivePlans: 0, totalPlans: 0 };
-    return res.render('administrator/dashboard', { admin: req.session.admin, stats, chartData: [] });
+    return res.render('administrator/dashboard', { admin: req.session.admin, stats, chartData: [], activePage: 'dashboard' });
   }
 };
 
 exports.showChangePassword = (req, res) => {
-  res.render('administrator/change-password', { admin: req.session.admin, error: null, message: null });
+  res.render('administrator/change-password', { admin: req.session.admin, error: null, message: null, activePage: 'change-password' });
 };
 
 exports.processChangePassword = async (req, res) => {

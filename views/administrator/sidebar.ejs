@@ -1,13 +1,25 @@
 <aside class="admin-sidebar">
   <div class="sidebar-brand">
-    <div class="sidebar-logo">DateYourLove</div>
-    <div class="sidebar-subtitle">Admin Panel</div>
+    <div class="sidebar-logo">DY</div>
+    <div class="sidebar-brand-text">
+      <div class="sidebar-brand-title">DateYourLove</div>
+      <div class="sidebar-brand-subtitle">Admin</div>
+    </div>
   </div>
-  <nav class="sidebar-nav">
-    <a href="/admin/dashboard" class="sidebar-link">Dashboard</a>
-    <a href="/admin/users" class="sidebar-link">Users</a>
-    <a href="/admin/plans" class="sidebar-link">Plans</a>
-    <a href="/admin/change-password" class="sidebar-link">Change Password</a>
-    <a href="/admin/logout" class="sidebar-link sidebar-logout">Logout</a>
-  </nav>
+
+  <div class="sidebar-group">
+    <div class="sidebar-group-title">MAIN</div>
+    <a href="/admin/dashboard" class="sidebar-link <%= activePage === 'dashboard' ? 'active' : '' %>"><span class="sidebar-icon">🏠</span>Dashboard</a>
+  </div>
+
+  <div class="sidebar-group">
+    <div class="sidebar-group-title">MANAGEMENT</div>
+    <a href="/admin/users" class="sidebar-link <%= activePage === 'users' ? 'active' : '' %>"><span class="sidebar-icon">👥</span>Users</a>
+    <a href="/admin/plans" class="sidebar-link <%= activePage === 'plans' ? 'active' : '' %>"><span class="sidebar-icon">💳</span>Plans</a>
+    <a href="/admin/change-password" class="sidebar-link <%= activePage === 'change-password' ? 'active' : '' %>"><span class="sidebar-icon">🔒</span>Change Password</a>
+  </div>
+
+  <div class="sidebar-group sidebar-group-bottom">
+    <a href="/admin/logout" class="sidebar-link sidebar-logout"><span class="sidebar-icon">🚪</span>Logout</a>
+  </div>
 </aside>

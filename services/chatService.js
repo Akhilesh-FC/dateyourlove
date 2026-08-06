@@ -104,7 +104,7 @@ async function getChatMessagesByRoom(roomId, page = 1, limit = 20) {
     `SELECT *
      FROM chat_messages
      WHERE room_id = ?
-     ORDER BY created_at ASC
+     ORDER BY created_at DESC, id DESC
      LIMIT ? OFFSET ?`,
     [roomId, safeLimit, offset]
   );
@@ -117,7 +117,7 @@ async function getChatMessagesByRoom(roomId, page = 1, limit = 20) {
   );
 
   return {
-    messages: formatChatMessages(messageRows),
+    messages: formatChatMessages(messageRows.reverse()),
     total: Number(countRows[0]?.total || 0),
     page: safePage,
     limit: safeLimit,

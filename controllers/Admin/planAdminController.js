@@ -22,6 +22,7 @@ exports.showPlans = async (req, res) => {
       admin: req.session.admin,
       planSummary: counts[0] || { activePlans: 0, inactivePlans: 0, totalPlans: 0 },
       plans,
+      activePage: 'plans',
     });
   } catch (err) {
     console.error('ADMIN PLANS ERROR:', err);

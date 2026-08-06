@@ -8,7 +8,7 @@ exports.showUsers = async (req, res) => {
        ORDER BY created_at DESC
        LIMIT 50`
     );
-    return res.render('administrator/users', { admin: req.session.admin, users });
+    return res.render('administrator/users', { admin: req.session.admin, users, activePage: 'users' });
   } catch (err) {
     console.error('ADMIN USERS ERROR:', err);
     return res.render('administrator/users', { admin: req.session.admin, users: [], error: 'Unable to load users' });

@@ -15,27 +15,63 @@
       <div class="page-header">
         <div>
           <h2>Dashboard</h2>
-          <p>Welcome back, <strong><%= admin.email %></strong>. Here is your administration overview.</p>
         </div>
       </div>
 
       <div class="stats-grid">
-        <div class="stat-card">Total Users<br /><strong><%= stats.users %></strong></div>
-        <div class="stat-card">Active Plans<br /><strong><%= stats.activePlans %></strong></div>
-        <div class="stat-card">Inactive Plans<br /><strong><%= stats.inactivePlans %></strong></div>
-        <div class="stat-card">Total Plans<br /><strong><%= stats.totalPlans %></strong></div>
+        <div class="stat-card stat-card-strong">
+          <div class="stat-title">Total Users</div>
+          <div class="stat-value"><%= stats.users %></div>
+        </div>
+        <div class="stat-card stat-card-soft">
+          <div class="stat-title">Active Plans</div>
+          <div class="stat-value"><%= stats.activePlans %></div>
+        </div>
+        <div class="stat-card stat-card-soft">
+          <div class="stat-title">Inactive Plans</div>
+          <div class="stat-value"><%= stats.inactivePlans %></div>
+        </div>
+        <div class="stat-card stat-card-soft">
+          <div class="stat-title">Total Plans</div>
+          <div class="stat-value"><%= stats.totalPlans %></div>
+        </div>
+        <div class="stat-card stat-card-soft">
+          <div class="stat-title">Weekly Signups</div>
+          <div class="stat-value"><%= chartData.reduce((sum, item) => sum + item.value, 0) %></div>
+        </div>
+        <div class="stat-card stat-card-soft">
+          <div class="stat-title">Today's Signups</div>
+          <div class="stat-value"><%= chartData.length ? chartData[chartData.length - 1].value : 0 %></div>
+        </div>
+        <div class="stat-card stat-card-soft">
+          <div class="stat-title">Avg / Day</div>
+          <div class="stat-value"><%= chartData.length ? Math.round(chartData.reduce((sum, item) => sum + item.value, 0) / chartData.length) : 0 %></div>
+        </div>
+        <div class="stat-card stat-card-soft">
+          <div class="stat-title">Admin Sessions</div>
+          <div class="stat-value">1</div>
+        </div>
       </div>
 
       <div class="dashboard-cards">
         <div class="card-panel chart-card">
-          <h3>Weekly Signups</h3>
+          <div class="card-panel-header">
+            <h3>Weekly Signups</h3>
+            <span class="badge">Live</span>
+          </div>
           <canvas id="signupChart"></canvas>
         </div>
 
-        <div class="card-panel">
-          <h3>Admin Controls</h3>
-          <p>Use the sidebar to navigate between Users, Plans, and Password settings.</p>
-          <p>Any password update will log out active admin sessions immediately.</p>
+        <div class="card-panel quick-actions">
+          <div class="card-panel-header">
+            <h3>Quick Actions</h3>
+          </div>
+          <div class="action-grid">
+            <div class="action-item">Manage users faster</div>
+            <div class="action-item">View active plans</div>
+            <div class="action-item">Change password securely</div>
+            <div class="action-item">Logout when done</div>
+          </div>
         </div>
       </div>
     </main>
