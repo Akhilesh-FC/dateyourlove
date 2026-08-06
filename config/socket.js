@@ -31,6 +31,14 @@ function initSocket(server) {
       socket.data.userId = normalizedUserId;
       socket.join(`user_${normalizedUserId}`);
       onlineUsers.set(normalizedUserId, socket.id);
+
+      const existingOnlineUserIds = getOnlineUsers().filter((id) => id !== normalizedUserId);
+      if (existingOnlineUserIds.length) {
+        socket.emit('presence_snapshot', {
+          users: existingOnlineUserIds.map((id) => ({ userId: id, status: 'online' })),
+        });
+      }
+
       io.emit('presence', { userId: normalizedUserId, status: 'online' });
 
       if (typeof callback === 'function') {

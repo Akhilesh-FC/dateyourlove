@@ -17,6 +17,10 @@ router.get('/logout', adminController.logout);
 
 // Protected dashboard
 router.get('/dashboard', auth, adminController.dashboard);
+router.get('/users', auth, require('../../controllers/Admin/userAdminController').showUsers);
+router.get('/plans', auth, require('../../controllers/Admin/planAdminController').showPlans);
+router.get('/change-password', auth, adminController.showChangePassword);
+router.post('/change-password', auth, adminController.processChangePassword);
 
 // Product management (CRUD)
 router.get('/products', auth, productAdminController.listProducts);

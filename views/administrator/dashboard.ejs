@@ -12,15 +12,64 @@
   <div class="admin-wrapper">
     <%- include('sidebar') %>
     <main class="admin-content">
-      <h2>Dashboard</h2>
-      <p>Welcome, <strong><%= admin.email %></strong></p>
+      <div class="page-header">
+        <div>
+          <h2>Dashboard</h2>
+          <p>Welcome back, <strong><%= admin.email %></strong>. Here is your administration overview.</p>
+        </div>
+      </div>
+
       <div class="stats-grid">
-        <div class="stat-card"><strong>Users</strong>: <%= stats.users %></div>
-        <div class="stat-card"><strong>Products</strong>: <%= stats.products %></div>
-        <div class="stat-card"><strong>Combos</strong>: <%= stats.combos %></div>
-        <div class="stat-card"><strong>Likes</strong>: <%= stats.likes %></div>
+        <div class="stat-card">Total Users<br /><strong><%= stats.users %></strong></div>
+        <div class="stat-card">Active Plans<br /><strong><%= stats.activePlans %></strong></div>
+        <div class="stat-card">Inactive Plans<br /><strong><%= stats.inactivePlans %></strong></div>
+        <div class="stat-card">Total Plans<br /><strong><%= stats.totalPlans %></strong></div>
+      </div>
+
+      <div class="dashboard-cards">
+        <div class="card-panel chart-card">
+          <h3>Weekly Signups</h3>
+          <canvas id="signupChart"></canvas>
+        </div>
+
+        <div class="card-panel">
+          <h3>Admin Controls</h3>
+          <p>Use the sidebar to navigate between Users, Plans, and Password settings.</p>
+          <p>Any password update will log out active admin sessions immediately.</p>
+        </div>
       </div>
     </main>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const chartData = <%- JSON.stringify(chartData || []) %>;
+    const labels = chartData.map(item => item.label);
+    const values = chartData.map(item => item.value);
+    const ctx = document.getElementById('signupChart');
+    if (ctx) {
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'New Users',
+            data: values,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.18)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: true, grid: { color: 'rgba(15, 23, 42, 0.08)' } },
+          },
+        },
+      });
+    }
+  </script>
 </body>
 </html>

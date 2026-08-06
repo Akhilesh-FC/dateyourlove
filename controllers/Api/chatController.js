@@ -108,8 +108,9 @@ exports.getChatRooms = async (req, res) => {
          FROM chat_messages
          WHERE room_id IN (${placeholders})
            AND is_seen = 0
+           AND receiver_id = ?
          GROUP BY room_id`,
-        roomIds
+        [...roomIds, userId]
       );
       for (const row of unreadRows) {
         unreadCounts.set(row.room_id, Number(row.unread_count || 0));

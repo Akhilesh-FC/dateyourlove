@@ -8,6 +8,11 @@ const db = require('../config/db');
 exports.getAdminByEmail = async (email) => {
   const sql = 'SELECT * FROM admins WHERE email = ? LIMIT 1';
   const [rows] = await db.query(sql, [email]);
-  // rows is an array of result objects
+  return rows[0] || null;
+};
+
+exports.getAdminById = async (id) => {
+  const sql = 'SELECT * FROM admins WHERE id = ? LIMIT 1';
+  const [rows] = await db.query(sql, [id]);
   return rows[0] || null;
 };

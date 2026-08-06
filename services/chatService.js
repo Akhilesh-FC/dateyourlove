@@ -71,8 +71,8 @@ async function buildRoomSummary(roomId, userId) {
   const otherUserCanReply = await userHasActiveSubscription(otherUserId);
 
   const [unreadRows] = await db.query(
-    `SELECT COUNT(*) AS unread_count FROM chat_messages WHERE room_id = ? AND is_seen = 0`,
-    [roomId]
+    `SELECT COUNT(*) AS unread_count FROM chat_messages WHERE room_id = ? AND receiver_id = ? AND is_seen = 0`,
+    [roomId, userId]
   );
   const unreadCount = Number(unreadRows[0]?.unread_count || 0);
 

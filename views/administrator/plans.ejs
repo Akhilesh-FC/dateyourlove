@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Plans – DateYourLove</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/admin.css" />
+</head>
+<body class="admin-body">
+  <%- include('header') %>
+  <div class="admin-wrapper">
+    <%- include('sidebar') %>
+    <main class="admin-content">
+      <div class="page-header">
+        <div>
+          <h2>Subscription Plans</h2>
+          <p>View current plan activity and recent subscription records.</p>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">Active Plans: <strong><%= planSummary.activePlans %></strong></div>
+        <div class="stat-card">Inactive Plans: <strong><%= planSummary.inactivePlans %></strong></div>
+        <div class="stat-card">Total Plans: <strong><%= planSummary.totalPlans %></strong></div>
+      </div>
+      <div class="card-panel table-card">
+        <h3>Recent Plan Records</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>User</th>
+              <th>Status</th>
+              <th>Start</th>
+              <th>End</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% plans.forEach((plan) => { %>
+              <tr>
+                <td><%= plan.id %></td>
+                <td><%= plan.email || plan.first_name || 'N/A' %></td>
+                <td><%= plan.status %></td>
+                <td><%= plan.start_date ? new Date(plan.start_date).toLocaleDateString() : '—' %></td>
+                <td><%= plan.end_date ? new Date(plan.end_date).toLocaleDateString() : '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+        <% if (!plans.length) { %>
+          <p>No plan records found.</p>
+        <% } %>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
