@@ -81,7 +81,18 @@ exports.respondCall = async (req, res) => {
 
       // send push to caller informing decline (best-effort)
       try {
-        const [rows] = await db.query('SELECT fcm_token FROM user_devices WHERE user_id = ? AND fcm_token IS NOT NULL', [otherUserId]);
+        let rows;
+        try {
+          const result = await db.query('SELECT fcm_token FROM user_devices WHERE user_id = ? AND fcm_token IS NOT NULL', [otherUserId]);
+          rows = result[0];
+        } catch (err) {
+          if (err && err.code === 'ER_NO_SUCH_TABLE') {
+            const fallback = await db.query('SELECT fcm_token FROM users WHERE id = ? AND fcm_token IS NOT NULL', [otherUserId]);
+            rows = fallback[0];
+          } else {
+            throw err;
+          }
+        }
         if (rows && rows.length) {
           const firebase = require('../../config/firebase');
           const tokens = rows.map(r => r.fcm_token).filter(Boolean);

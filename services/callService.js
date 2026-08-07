@@ -41,7 +41,17 @@ async function sendIncomingCallPush({ calleeId, callerName, channelName, callId 
       },
     };
     // Lookup FCM tokens for callee from DB
-    const [rows] = await db.query('SELECT fcm_token FROM user_devices WHERE user_id = ? AND fcm_token IS NOT NULL', [calleeId]);
+    let rows;
+    try {
+      [rows] = await db.query('SELECT fcm_token FROM user_devices WHERE user_id = ? AND fcm_token IS NOT NULL', [calleeId]);
+    } catch (err) {
+      if (err && err.code === 'ER_NO_SUCH_TABLE') {
+        const [fallbackRows] = await db.query('SELECT fcm_token FROM users WHERE id = ? AND fcm_token IS NOT NULL', [calleeId]);
+        rows = fallbackRows;
+      } else {
+        throw err;
+      }
+    }
     if (!rows || !rows.length) return false;
     const tokens = rows.map(r => r.fcm_token).filter(Boolean);
     if (!tokens.length) return false;
