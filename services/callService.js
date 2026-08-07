@@ -87,4 +87,4 @@ async function sendIncomingCallPush({ calleeId, callerName, channelName, callId 
   }
 }
 
-module.exports = { createCallSession, updateCallStatus, generateAgoraToken, callState, sendIncomingCallPush };
+module.exports = { createCallSession, updateCallStatus, isUserInActiveCall, generateAgoraToken, callState, sendIncomingCallPush };
