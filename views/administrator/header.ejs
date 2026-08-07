@@ -1,19 +1,32 @@
 <!-- views/administrator/header.ejs -->
 <header class="admin-header">
-  <div class="logo-row">
-    <div class="logo-icon">
-      <img src="/dateyourlovelogo.png" alt="DateYourLove" class="header-logo-img" />
+  <div class="header-start">
+    <button class="menu-btn" type="button" aria-label="Toggle menu">☰</button>
+    <div class="header-brand">
+      <div class="logo-icon">
+        <img src="/dateyourlovelogo.png" alt="DateYourLove" class="header-logo-img" />
+      </div>
+      <div class="header-brand-text">
+        <div class="header-brand-title">DateYourLove</div>
+        <div class="header-brand-subtitle">Admin Panel</div>
+      </div>
     </div>
   </div>
 
-  <div class="profile-menu">
-    <button class="profile-toggle" id="profileToggle" type="button">
-      <span><%= admin.email %></span>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+  <div class="header-actions">
+    <button class="icon-button" type="button" aria-label="Notifications">
+      🔔
+      <span class="notification-badge">6</span>
     </button>
-    <div class="profile-dropdown" id="profileDropdown">
-      <div class="profile-dropdown-item"><strong><%= admin.email %></strong></div>
-      <a class="profile-dropdown-item" href="/admin/logout">Logout</a>
+    <div class="profile-menu">
+      <button class="profile-toggle" id="profileToggle" type="button">
+        <span><%= admin.email %></span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="profile-dropdown" id="profileDropdown">
+        <div class="profile-dropdown-item"><strong><%= admin.email %></strong></div>
+        <a class="profile-dropdown-item" href="/admin/logout">Logout</a>
+      </div>
     </div>
   </div>
 </header>

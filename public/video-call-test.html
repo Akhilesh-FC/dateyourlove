@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Call Signaling Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f0f4f8; margin: 0; padding: 0; }
+    .container { max-width: 1024px; margin: 20px auto; padding: 20px; }
+    .panel { background: #fff; border-radius: 12px; box-shadow: 0 10px 30px rgba(15,23,42,0.08); padding: 20px; margin-bottom: 20px; }
+    .panel h1, .panel h2 { margin-top: 0; }
+    label { display: block; margin: 14px 0 6px; font-weight: 600; }
+    input, textarea, select { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; }
+    button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 16px; margin-top: 12px; background: #2563eb; color: #fff; transition: background 0.2s ease; }
+    button:hover { background: #1d4ed8; }
+    button.secondary { background: #64748b; }
+    .row { display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
+    .log-box { background: #0f172a; color: #f8fafc; min-height: 280px; padding: 16px; border-radius: 10px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; }
+    .flex { display: flex; gap: 10px; flex-wrap: wrap; }
+    .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #e2e8f0; }
+    .text-small { font-size: 14px; color: #475569; }
+    .note { margin-top: 10px; color: #334155; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="panel">
+      <h1>Video Call Signaling Test Page</h1>
+      <p class="note">This page tests the call signaling REST APIs and Socket.IO events. It does not perform actual Agora media join unless your backend returns a valid token.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Connection</h2>
+      <div class="row">
+        <div>
+          <label for="serverUrl">Server URL</label>
+          <input id="serverUrl" type="text" value="http://localhost:3001" />
+
+          <label for="authToken">Authorization Token</label>
+          <input id="authToken" type="text" placeholder="Bearer token for API calls" />
+
+          <label for="userId">Your User ID</label>
+          <input id="userId" type="text" placeholder="Enter user ID" />
+
+          <button id="connectBtn">Connect Socket</button>
+          <button id="disconnectBtn" class="secondary">Disconnect</button>
+          <button id="joinSocketBtn" class="secondary">Join Socket User Room</button>
+          <div class="note">After connecting, press Join Socket User Room to receive incoming call events for your user.</div>
+        </div>
+        <div>
+          <label>Status</label>
+          <div id="statusBadge" class="badge">disconnected</div>
+          <div class="note">Use the same user ID on two browser tabs to simulate caller and callee.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Call actions</h2>
+      <div class="row">
+        <div>
+          <label for="calleeId">Callee User ID</label>
+          <input id="calleeId" type="text" placeholder="User ID to call" />
+
+          <button id="requestCallBtn">Request Call</button>
+        </div>
+        <div>
+          <label for="callId">Call ID</label>
+          <input id="callId" type="text" placeholder="Returned callId" />
+
+          <label for="responseAction">Response action</label>
+          <select id="responseAction">
+            <option value="accept">Accept</option>
+            <option value="decline">Decline</option>
+          </select>
+
+          <button id="respondCallBtn">Respond to Call</button>
+          <button id="endCallBtn" class="secondary">End Call</button>
+        </div>
+      </div>
+      <div class="note">The call flow is: request → incoming_call event → respond → call_accepted / call_declined → end.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Incoming event tester</h2>
+      <div class="note">This section logs Socket.IO incoming events and REST API responses.</div>
+      <div class="log-box" id="logBox"></div>
+      <button id="clearLogsBtn" class="secondary">Clear logs</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    if (typeof io === 'undefined') {
+      const fallback = document.createElement('script');
+      fallback.src = 'https://cdn.socket.io/4.7.2/socket.io.min.js';
+      fallback.crossOrigin = 'anonymous';
+      fallback.onload = () => {
+        console.log('Loaded Socket.IO client from CDN fallback');
+      };
+      fallback.onerror = () => {
+        console.error('Socket.IO client failed to load from both /socket.io/socket.io.js and CDN');
+        alert('Socket.IO client library failed to load. Open this page through the app server at http://localhost:3001/video-call-test.html and ensure the backend is running.');
+      };
+      document.head.appendChild(fallback);
+    }
+  </script>
+  <script>
+    const serverUrlInput = document.getElementById('serverUrl');
+    const authTokenInput = document.getElementById('authToken');
+    const userIdInput = document.getElementById('userId');
+    const calleeIdInput = document.getElementById('calleeId');
+    const callIdInput = document.getElementById('callId');
+    const responseActionSelect = document.getElementById('responseAction');
+    const statusBadge = document.getElementById('statusBadge');
+    const logBox = document.getElementById('logBox');
+
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const joinSocketBtn = document.getElementById('joinSocketBtn');
+    const requestCallBtn = document.getElementById('requestCallBtn');
+    const respondCallBtn = document.getElementById('respondCallBtn');
+    const endCallBtn = document.getElementById('endCallBtn');
+    const clearLogsBtn = document.getElementById('clearLogsBtn');
+
+    let socket = null;
+    let connected = false;
+
+    function log(message) {
+      const time = new Date().toLocaleTimeString();
+      logBox.textContent += `[${time}] ${message}\n`;
+      logBox.scrollTop = logBox.scrollHeight;
+      console.log(message);
+    }
+
+    function setStatus(text) {
+      statusBadge.textContent = text;
+    }
+
+    function createSocket() {
+      if (typeof io === 'undefined') {
+        alert('Socket.IO client is not loaded. Open this page through the app server (http://localhost:3001/video-call-test.html) and ensure Socket.IO is available.');
+        return;
+      }
+
+      if (socket) {
+        socket.disconnect();
+        socket = null;
+      }
+
+      const url = serverUrlInput.value.trim();
+      const userId = userIdInput.value.trim();
+      if (!url || !userId) {
+        alert('Enter server URL and user ID first');
+        return;
+      }
+
+      socket = io(url, { transports: ['websocket', 'polling'] });
+
+      socket.on('connect', () => {
+        connected = true;
+        setStatus('connected');
+        log(`socket connected: ${socket.id}`);
+      });
+
+      socket.on('disconnect', (reason) => {
+        connected = false;
+        setStatus('disconnected');
+        log(`socket disconnected: ${reason}`);
+      });
+
+      socket.on('connect_error', (err) => {
+        setStatus('connect error');
+        log(`connect_error: ${err.message}`);
+      });
+
+      socket.on('incoming_call', (data) => {
+        log(`incoming_call event: ${JSON.stringify(data)}`);
+        callIdInput.value = data.callId || callIdInput.value;
+      });
+
+      socket.on('call_accepted', (data) => {
+        log(`call_accepted event: ${JSON.stringify(data)}`);
+      });
+
+      socket.on('call_declined', (data) => {
+        log(`call_declined event: ${JSON.stringify(data)}`);
+      });
+
+      socket.on('call_ended', (data) => {
+        log(`call_ended event: ${JSON.stringify(data)}`);
+      });
+    }
+
+    async function callApi(path, body) {
+      const url = `${serverUrlInput.value.trim().replace(/\/$/, '')}/api${path}`;
+      const token = authTokenInput.value.trim();
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+      const json = await response.json().catch(() => ({}));
+      return { status: response.status, body: json };
+    }
+
+    connectBtn.addEventListener('click', () => {
+      createSocket();
+    });
+
+    joinSocketBtn.addEventListener('click', () => {
+      if (!socket) {
+        alert('Connect first');
+        return;
+      }
+      const userId = userIdInput.value.trim();
+      if (!userId) {
+        alert('Enter user ID first');
+        return;
+      }
+      socket.emit('join', { userId }, (response) => {
+        log(`join ack: ${JSON.stringify(response)}`);
+      });
+    });
+
+    disconnectBtn.addEventListener('click', () => {
+      if (!socket) return;
+      socket.disconnect();
+      socket = null;
+      connected = false;
+      setStatus('disconnected');
+      log('socket disconnected by user');
+    });
+
+    requestCallBtn.addEventListener('click', async () => {
+      const calleeId = calleeIdInput.value.trim();
+      if (!calleeId) {
+        alert('Enter callee ID');
+        return;
+      }
+      const result = await callApi('/call/request', { calleeId });
+      log(`POST /api/call/request ${result.status} ${JSON.stringify(result.body)}`);
+      if (result.body.callId) callIdInput.value = result.body.callId;
+    });
+
+    respondCallBtn.addEventListener('click', async () => {
+      const callId = callIdInput.value.trim();
+      const action = responseActionSelect.value;
+      if (!callId) {
+        alert('Enter callId');
+        return;
+      }
+      const result = await callApi('/call/respond', { callId, action });
+      log(`POST /api/call/respond ${result.status} ${JSON.stringify(result.body)}`);
+    });
+
+    endCallBtn.addEventListener('click', async () => {
+      const callId = callIdInput.value.trim();
+      if (!callId) {
+        alert('Enter callId');
+        return;
+      }
+      const result = await callApi('/call/end', { callId });
+      log(`POST /api/call/end ${result.status} ${JSON.stringify(result.body)}`);
+    });
+
+    clearLogsBtn.addEventListener('click', () => {
+      logBox.textContent = '';
+    });
+  </script>
+</body>
+</html>
