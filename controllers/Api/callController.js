@@ -16,8 +16,23 @@ exports.requestCall = async (req, res) => {
     const callerHasPlan = await chatService.userHasActiveSubscription(callerId);
     if (!callerHasPlan) return res.status(403).json({ message: 'Active subscription required' });
 
-    if (callState.isBusy(callerId)) return res.status(409).json({ message: 'Caller already in another call' });
-    if (callState.isBusy(calleeId)) return res.status(409).json({ message: 'Callee is busy' });
+    const callerActiveCall = await callService.isUserInActiveCall(callerId);
+    if (callerActiveCall) {
+      if (!callState.isBusy(callerId)) callState.setBusy(callerId, callerActiveCall);
+      return res.status(409).json({ message: 'Caller already in another call' });
+    }
+    if (callState.isBusy(callerId)) {
+      callState.clearBusy(callerId);
+    }
+
+    const calleeActiveCall = await callService.isUserInActiveCall(calleeId);
+    if (calleeActiveCall) {
+      if (!callState.isBusy(calleeId)) callState.setBusy(calleeId, calleeActiveCall);
+      return res.status(409).json({ message: 'Callee is busy' });
+    }
+    if (callState.isBusy(calleeId)) {
+      callState.clearBusy(calleeId);
+    }
 
     const channelName = `call_${Math.floor(Date.now()/1000)}_${callerId}_${calleeId}`;
     const session = await callService.createCallSession({ callerId, calleeId, channelName });
@@ -94,17 +109,17 @@ exports.respondCall = async (req, res) => {
           }
         }
         if (rows && rows.length) {
-          const firebase = require('../../config/firebase');
+          const { messaging } = require('../../config/firebase');
           const tokens = rows.map(r => r.fcm_token).filter(Boolean);
-          if (tokens.length && firebase && firebase.messaging) {
+          if (tokens.length && messaging) {
             const payload = {
               notification: { title: 'Call declined', body: 'User declined your call' },
               data: { type: 'call_declined', callId: String(callId) }
             };
-            if (typeof firebase.messaging().sendMulticast === 'function') {
-              await firebase.messaging().sendMulticast({ tokens, notification: payload.notification, data: payload.data });
+            if (typeof messaging.sendMulticast === 'function') {
+              await messaging.sendMulticast({ tokens, notification: payload.notification, data: payload.data });
             } else {
-              for (const t of tokens) await firebase.messaging().send({ token: t, notification: payload.notification, data: payload.data });
+              for (const t of tokens) await messaging.send({ token: t, notification: payload.notification, data: payload.data });
             }
           }
         }
