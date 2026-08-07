@@ -1,4 +1,5 @@
 // controllers/Api/callController.js
+const db = require('../../config/db');
 const callService = require('../../services/callService');
 const callState = require('../../services/callState');
 const chatService = require('../../services/chatService');
@@ -40,7 +41,7 @@ exports.requestCall = async (req, res) => {
     }
 
     // send push notification via firebase (best-effort)
-    const callerNameRow = await req.db.query('SELECT first_name FROM users WHERE id = ?', [callerId]).catch(() => null);
+    const callerNameRow = await db.query('SELECT first_name FROM users WHERE id = ?', [callerId]).catch(() => null);
     const callerName = callerNameRow && callerNameRow[0] && callerNameRow[0][0] ? callerNameRow[0][0].first_name : 'Someone';
     try {
       await callService.sendIncomingCallPush({ calleeId, callerName, channelName, callId: session.callUuid });
@@ -80,7 +81,7 @@ exports.respondCall = async (req, res) => {
 
       // send push to caller informing decline (best-effort)
       try {
-        const [rows] = await req.db.query('SELECT fcm_token FROM user_devices WHERE user_id = ? AND fcm_token IS NOT NULL', [otherUserId]);
+        const [rows] = await db.query('SELECT fcm_token FROM user_devices WHERE user_id = ? AND fcm_token IS NOT NULL', [otherUserId]);
         if (rows && rows.length) {
           const firebase = require('../../config/firebase');
           const tokens = rows.map(r => r.fcm_token).filter(Boolean);
