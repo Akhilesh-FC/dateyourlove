@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const callState = require('./callState');
 const { getIo } = require('../config/socket');
 const { messaging } = require('../config/firebase');
+const { RtcTokenBuilder, RtcRole } = require('agora-token');
 
 async function createCallSession({ callerId, calleeId, channelName }) {
   const callUuid = uuidv4();
@@ -65,9 +66,27 @@ function isSessionStatusActive(status) {
   return ['ringing', 'accepted', 'busy'].includes(String(status));
 }
 
-// Placeholder: implement real Agora token generation server-side
 async function generateAgoraToken(channelName, uid) {
-  return { token: 'AGORA_TOKEN_PLACEHOLDER', channelName, uid };
+  const appId = process.env.AGORA_APP_ID;
+  const appCertificate = process.env.AGORA_APP_CERTIFICATE;
+  const expireSeconds = parseInt(process.env.AGORA_TOKEN_EXPIRE_SECONDS || '3600', 10);
+
+  if (!appId || !appCertificate) {
+    throw new Error('Agora App ID and App Certificate are required');
+  }
+
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const privilegeExpiredTs = currentTimestamp + expireSeconds;
+  const numericUid = Number(uid) || 0;
+
+  return RtcTokenBuilder.buildTokenWithUid(
+    appId,
+    appCertificate,
+    channelName,
+    numericUid,
+    RtcRole.PUBLISHER,
+    privilegeExpiredTs
+  );
 }
 
 async function sendIncomingCallPush({ calleeId, callerName, channelName, callId }) {

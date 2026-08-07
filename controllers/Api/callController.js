@@ -87,9 +87,9 @@ exports.respondCall = async (req, res) => {
     const otherUserId = (Number(updated.caller_id) === Number(userId)) ? updated.callee_id : updated.caller_id;
 
     if (action === 'accept') {
-      const tokenObj = await callService.generateAgoraToken(updated.channel_name, userId);
-      if (io) io.to(`user_${otherUserId}`).emit('call_accepted', { callId, channelName: updated.channel_name, agoraToken: tokenObj.token });
-      return res.status(200).json({ success: true, callId, channelName: updated.channel_name, agoraToken: tokenObj.token });
+      const agoraToken = await callService.generateAgoraToken(updated.channel_name, userId);
+      if (io) io.to(`user_${otherUserId}`).emit('call_accepted', { callId, channelName: updated.channel_name, agoraToken });
+      return res.status(200).json({ success: true, callId, channelName: updated.channel_name, agoraToken });
     } else {
       if (io) io.to(`user_${otherUserId}`).emit('call_declined', { callId, reason: 'user_declined' });
       // clear busy flags
