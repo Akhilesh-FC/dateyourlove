@@ -15,7 +15,19 @@ async function createCallSession({ callerId, calleeId, channelName }) {
 }
 
 async function updateCallStatus(callUuid, status) {
-  await db.query(`UPDATE video_call_sessions SET status = ?, updated_at = NOW() WHERE call_uuid = ?`, [status, callUuid]);
+  const updates = [];
+  const params = [status, callUuid];
+
+  if (status === 'accepted') {
+    updates.push('started_at = NOW()');
+  }
+  if (status === 'ended') {
+    updates.push('ended_at = NOW()');
+    updates.push('duration_seconds = IF(started_at IS NOT NULL, TIMESTAMPDIFF(SECOND, started_at, NOW()), NULL)');
+  }
+
+  const updateClause = updates.length ? `, ${updates.join(', ')}` : '';
+  await db.query(`UPDATE video_call_sessions SET status = ?${updateClause}, updated_at = NOW() WHERE call_uuid = ?`, params);
   const [rows] = await db.query(`SELECT * FROM video_call_sessions WHERE call_uuid = ? LIMIT 1`, [callUuid]);
   return rows[0] || null;
 }
@@ -25,9 +37,25 @@ async function getCallSession(callUuid) {
   return rows[0] || null;
 }
 
+async function cleanupExpiredRingingCalls(ageSeconds = 45) {
+  await db.query(
+    `UPDATE video_call_sessions
+     SET status = 'missed', updated_at = NOW()
+     WHERE status = 'ringing' AND created_at < DATE_SUB(NOW(), INTERVAL ? SECOND)`,
+    [ageSeconds]
+  );
+}
+
 async function isUserInActiveCall(userId) {
   const [rows] = await db.query(
-    `SELECT call_uuid FROM video_call_sessions WHERE (caller_id = ? OR callee_id = ?) AND status IN ('ringing', 'accepted', 'busy') LIMIT 1`,
+    `SELECT call_uuid FROM video_call_sessions
+     WHERE (caller_id = ? OR callee_id = ?)
+       AND (
+         status IN ('accepted', 'busy')
+         OR (status = 'ringing' AND created_at > DATE_SUB(NOW(), INTERVAL 45 SECOND))
+       )
+     ORDER BY created_at DESC
+     LIMIT 1`,
     [userId, userId]
   );
   return rows[0] ? rows[0].call_uuid : null;
@@ -87,4 +115,4 @@ async function sendIncomingCallPush({ calleeId, callerName, channelName, callId 
   }
 }
 
-module.exports = { createCallSession, updateCallStatus, isUserInActiveCall, generateAgoraToken, callState, sendIncomingCallPush };
+module.exports = { createCallSession, updateCallStatus, cleanupExpiredRingingCalls, isUserInActiveCall, generateAgoraToken, callState, sendIncomingCallPush };

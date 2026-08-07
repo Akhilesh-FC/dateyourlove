@@ -16,6 +16,8 @@ exports.requestCall = async (req, res) => {
     const callerHasPlan = await chatService.userHasActiveSubscription(callerId);
     if (!callerHasPlan) return res.status(403).json({ message: 'Active subscription required' });
 
+    await callService.cleanupExpiredRingingCalls();
+
     const callerActiveCall = await callService.isUserInActiveCall(callerId);
     if (callerActiveCall) {
       if (!callState.isBusy(callerId)) callState.setBusy(callerId, callerActiveCall);
