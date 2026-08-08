@@ -147,6 +147,62 @@ function formatChatMessages(rows) {
   }));
 }
 
+async function getVideoCallsByRoom(roomId) {
+  const match = /^room_(\d+)_(\d+)$/.exec(roomId);
+  if (!match) return [];
+
+  const user1 = Number(match[1]);
+  const user2 = Number(match[2]);
+  const [rows] = await db.query(
+    `SELECT call_uuid, caller_id, callee_id, channel_name, status, started_at, ended_at, duration_seconds, created_at, updated_at
+     FROM video_call_sessions
+     WHERE (caller_id = ? AND callee_id = ?)
+        OR (caller_id = ? AND callee_id = ?)
+     ORDER BY created_at DESC`,
+    [user1, user2, user2, user1]
+  );
+
+  return rows.map((row) => ({
+    callUuid: row.call_uuid,
+    callerId: row.caller_id,
+    calleeId: row.callee_id,
+    channelName: row.channel_name,
+    status: row.status,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    durationSeconds: row.duration_seconds,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+async function getLastVideoCallBetweenUsers(user1Id, user2Id) {
+  const [rows] = await db.query(
+    `SELECT call_uuid, caller_id, callee_id, channel_name, status, started_at, ended_at, duration_seconds, created_at, updated_at
+     FROM video_call_sessions
+     WHERE (caller_id = ? AND callee_id = ?)
+        OR (caller_id = ? AND callee_id = ?)
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [Number(user1Id), Number(user2Id), Number(user2Id), Number(user1Id)]
+  );
+
+  if (!rows.length) return null;
+  const row = rows[0];
+  return {
+    callUuid: row.call_uuid,
+    callerId: row.caller_id,
+    calleeId: row.callee_id,
+    channelName: row.channel_name,
+    status: row.status,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    durationSeconds: row.duration_seconds,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 module.exports = {
   userHasActiveSubscription,
   getRoomForUser,
@@ -154,4 +210,6 @@ module.exports = {
   getChatMessagesByRoom,
   insertChatMessage,
   formatChatMessages,
+  getVideoCallsByRoom,
+  getLastVideoCallBetweenUsers,
 };

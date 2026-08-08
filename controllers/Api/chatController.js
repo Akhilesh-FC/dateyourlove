@@ -157,6 +157,7 @@ exports.getChatRooms = async (req, res) => {
       } catch (photoErr) {
         otherUser.images = [];
       }
+      const lastVideoCall = await chatService.getLastVideoCallBetweenUsers(userId, otherUserId);
       rooms.push({
         roomId: row.room_id,
         otherUser,
@@ -167,6 +168,7 @@ exports.getChatRooms = async (req, res) => {
         updatedAt: row.updated_at,
         unreadCount: unreadCounts.get(row.room_id) || 0,
         lastMessage: lastMessages.get(row.room_id) || null,
+        lastVideoCall,
       });
     }
 
@@ -201,6 +203,7 @@ exports.getChatMessages = async (req, res) => {
     }
 
     const history = await chatService.getChatMessagesByRoom(roomId, page, limit);
+    const videoCalls = await chatService.getVideoCallsByRoom(roomId);
     return res.status(200).json({
       roomId,
       page: history.page,
@@ -208,6 +211,7 @@ exports.getChatMessages = async (req, res) => {
       total: history.total,
       canReply: true,
       messages: history.messages,
+      videoCalls,
     });
   } catch (err) {
     console.error('GET CHAT MESSAGES ERROR:', err.message);
