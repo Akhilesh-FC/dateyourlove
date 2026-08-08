@@ -1,7 +1,7 @@
 const db = require('../../config/db');
 const { buildUserPayload } = require('../../controllers/Api/userController');
 const { toFullUrl } = require('../../utils/appHelpers');
-const { getIo, isUserOnline, notifyUserMessage } = require('../../config/socket');
+const { getIo, isUserOnline, isUserActiveInRoom, notifyUserMessage } = require('../../config/socket');
 const chatService = require('../../services/chatService');
 
 async function userHasActiveSubscription(userId) {
@@ -257,6 +257,7 @@ exports.sendMessage = async (req, res) => {
       ...insertedMessage,
       roomId,
       receiverHasPlan,
+      suppressNotification: isUserActiveInRoom(Number(receiverId), roomId),
     };
 
     let delivered = false;

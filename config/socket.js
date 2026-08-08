@@ -1,4 +1,4 @@
-const { Server } = require('socket.io');
+﻿const { Server } = require('socket.io');
 const db = require('../config/db');
 const chatService = require('../services/chatService');
 const { messaging } = require('./firebase');
@@ -14,7 +14,7 @@ function setUserSocket(userId, socketId) {
   const normalizedUserId = String(userId);
   const entry = onlineUsers.get(normalizedUserId);
   if (!entry) {
-    onlineUsers.set(normalizedUserId, { socketIds: new Set([socketId]), activeRoomId: null });
+    onlineUsers.set(normalizedUserId, { socketIds: new Set([socketId]), activeRoomIds: new Set() });
     return;
   }
   entry.socketIds.add(socketId);
@@ -28,6 +28,48 @@ function removeUserSocket(userId, socketId) {
   if (!entry.socketIds.size) {
     onlineUsers.delete(normalizedUserId);
   }
+}
+
+function addUserActiveRoom(userId, roomId) {
+  const entry = getUserEntry(userId);
+  if (!entry || !roomId) return;
+  entry.activeRoomIds.add(String(roomId).trim());
+}
+
+function removeUserActiveRoom(userId, roomId) {
+  const entry = getUserEntry(userId);
+  if (!entry || !roomId) return;
+  entry.activeRoomIds.delete(String(roomId).trim());
+}
+
+function normalizeRoomId(data) {
+  if (typeof data === 'string') {
+    return data.trim();
+  }
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+
+  let roomId = data.roomId || data.room || data.chatRoom || data.room_id || data.roomID || data.id || data.roomIdValue;
+  if (!roomId) {
+    for (const key of Object.keys(data)) {
+      const value = data[key];
+      if (typeof value === 'string' && /room/i.test(key)) {
+        roomId = value;
+        break;
+      }
+    }
+  }
+  if (!roomId) {
+    for (const key of Object.keys(data)) {
+      const value = data[key];
+      if (typeof value === 'string' && /^room_\d+_\d+$/.test(value.trim())) {
+        roomId = value;
+        break;
+      }
+    }
+  }
+  return roomId ? String(roomId).trim() : null;
 }
 
 /**
@@ -107,12 +149,17 @@ function initSocket(server) {
         }
         return;
       }
-      const roomId = data?.roomId || data?.room || data?.chatRoom || data?.room_id || data?.roomID;
-      const normalizedRoomId = roomId ? String(roomId).trim() : null;
-      const entry = getUserEntry(senderId);
-      if (entry) {
-        entry.activeRoomId = normalizedRoomId;
+
+      const normalizedRoomId = normalizeRoomId(data);
+      const previousRoomId = socket.data.activeRoomId;
+      if (previousRoomId) {
+        removeUserActiveRoom(senderId, previousRoomId);
       }
+      socket.data.activeRoomId = normalizedRoomId;
+      if (normalizedRoomId) {
+        addUserActiveRoom(senderId, normalizedRoomId);
+      }
+
       if (typeof callback === 'function') {
         callback({ success: true, roomId: normalizedRoomId });
       }
@@ -126,10 +173,13 @@ function initSocket(server) {
         }
         return;
       }
-      const entry = getUserEntry(senderId);
-      if (entry) {
-        entry.activeRoomId = null;
+
+      const previousRoomId = socket.data.activeRoomId;
+      if (previousRoomId) {
+        removeUserActiveRoom(senderId, previousRoomId);
+        socket.data.activeRoomId = null;
       }
+
       if (typeof callback === 'function') {
         callback({ success: true });
       }
@@ -139,10 +189,14 @@ function initSocket(server) {
     socket.on('enter_room', setActiveRoom);
     socket.on('set_active_room', setActiveRoom);
     socket.on('room_active', setActiveRoom);
+    socket.on('chat_screen_open', setActiveRoom);
+    socket.on('chat_screen_active', setActiveRoom);
     socket.on('clear_active_room', clearActiveRoom);
     socket.on('leave_room', clearActiveRoom);
     socket.on('clear_room', clearActiveRoom);
     socket.on('room_inactive', clearActiveRoom);
+    socket.on('chat_screen_close', clearActiveRoom);
+    socket.on('chat_screen_inactive', clearActiveRoom);
 
     socket.on('chat_message', async (data, callback) => {
       try {
@@ -189,9 +243,11 @@ function initSocket(server) {
           });
         }
 
+        const suppressNotification = isUserActiveInRoom(Number(receiverId), roomId);
         io.to(`user_${receiverId}`).emit('message', {
           ...insertedMessage,
           receiverHasPlan,
+          suppressNotification,
         });
         await notifyUserMessage(Number(receiverId), senderId, roomId, message || (imageUrl ? 'sent a photo' : 'New message received'));
 
@@ -203,7 +259,7 @@ function initSocket(server) {
             io.to(`user_${receiverId}`).emit('room_update', summaryForReceiver);
           }
           if (summaryForSender) {
-            summaryForSender.isOnline = isUserOnline(receiverId);
+            summaryForSender.isOnline = isUserOnline(Number(receiverId));
             io.to(`user_${senderId}`).emit('room_update', summaryForSender);
           }
         } catch (emitErr) {
@@ -227,6 +283,10 @@ function initSocket(server) {
     socket.on('disconnect', () => {
       const userId = socket.data.userId;
       if (userId) {
+        const activeRoomId = socket.data.activeRoomId;
+        if (activeRoomId) {
+          removeUserActiveRoom(userId, activeRoomId);
+        }
         removeUserSocket(userId, socket.id);
         io.emit('presence', { userId, status: 'offline' });
       }
@@ -246,9 +306,10 @@ function isUserOnline(userId) {
 }
 
 function isUserActiveInRoom(userId, roomId) {
+  if (!roomId) return false;
   const entry = getUserEntry(userId);
-  if (!entry) return false;
-  return Boolean(entry.activeRoomId && String(entry.activeRoomId).trim() === String(roomId).trim());
+  if (!entry || !entry.activeRoomIds) return false;
+  return entry.activeRoomIds.has(String(roomId).trim());
 }
 
 async function notifyUserMessage(userId, senderId, roomId, messageText) {
