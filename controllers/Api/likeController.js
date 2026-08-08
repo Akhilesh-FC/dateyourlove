@@ -195,16 +195,20 @@ exports.toggleLike = async (req, res) => {
       const [targetUserRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [likee_id]);
       const fcmToken = targetUserRows[0] ? targetUserRows[0].fcm_token : null;
 
+      const [likerRows] = await db.query('SELECT first_name FROM users WHERE id = ? LIMIT 1', [likerId]);
+      const likerName = likerRows[0]?.first_name || `User ${likerId}`;
+
       emitSocketEvents(likee_id, 'liked', {
         type: action,
         from: likerId,
-        message: `User ${likerId} ${action === 'like' ? 'liked' : 'superliked'} you!`,
+        fromName: likerName,
+        message: `${likerName} ${action === 'like' ? 'liked' : 'superliked'} you!`,
       });
 
       const title = action === 'like' ? 'New Like!' : 'New Superlike!';
       const bodyMessage = action === 'like'
-        ? `User ${likerId} liked your profile.`
-        : `User ${likerId} superliked your profile.`;
+        ? `${likerName} liked your profile.`
+        : `${likerName} superliked your profile.`;
       await sendFcm(fcmToken, title, bodyMessage);
 
       const [mutualLikeRows] = await db.query(

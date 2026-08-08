@@ -236,10 +236,14 @@ exports.recordSwipeAction = async (req, res) => {
       const [targetUserRows] = await db.query('SELECT fcm_token FROM users WHERE id = ?', [targetUserId]);
       const targetToken = targetUserRows[0] ? targetUserRows[0].fcm_token : null;
 
+      const [likerRows] = await db.query('SELECT first_name FROM users WHERE id = ? LIMIT 1', [userId]);
+      const likerName = likerRows[0]?.first_name || `User ${userId}`;
+
       const likePayload = {
         type: action,
         from: userId,
-        message: `User ${userId} ${action === 'like' ? 'liked' : 'superliked'} you!`,
+        fromName: likerName,
+        message: `${likerName} ${action === 'like' ? 'liked' : 'superliked'} you!`,
       };
       const io = getIo();
       if (io) {
@@ -249,8 +253,8 @@ exports.recordSwipeAction = async (req, res) => {
 
       const title = action === 'like' ? 'New Like!' : 'New Superlike!';
       const bodyMessage = action === 'like'
-        ? `User ${userId} liked your profile.`
-        : `User ${userId} superliked your profile.`;
+        ? `${likerName} liked your profile.`
+        : `${likerName} superliked your profile.`;
       if (targetToken) {
         try {
           await messaging.send({
