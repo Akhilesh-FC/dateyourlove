@@ -222,7 +222,9 @@ exports.getChatMessages = async (req, res) => {
 exports.sendMessage = async (req, res) => {
   try {
     const senderId = req.user.id;
-    const { roomId, receiverId, message } = req.body;
+    const rawRoomId = req.body.roomId || req.body.room || req.body.chatRoom || req.body.room_id || req.body.roomID;
+    const roomId = rawRoomId ? String(rawRoomId).trim() : '';
+    const { receiverId, message } = req.body;
     const imageUrl = req.body.image_url || req.body.imageUrl || null;
 
     if (!roomId || !receiverId || (!message && !imageUrl)) {

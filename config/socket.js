@@ -5,6 +5,31 @@ const { messaging } = require('./firebase');
 let io = null;
 const onlineUsers = new Map();
 
+function getUserEntry(userId) {
+  const normalizedUserId = String(userId);
+  return onlineUsers.get(normalizedUserId) || null;
+}
+
+function setUserSocket(userId, socketId) {
+  const normalizedUserId = String(userId);
+  const entry = onlineUsers.get(normalizedUserId);
+  if (!entry) {
+    onlineUsers.set(normalizedUserId, { socketIds: new Set([socketId]), activeRoomId: null });
+    return;
+  }
+  entry.socketIds.add(socketId);
+}
+
+function removeUserSocket(userId, socketId) {
+  const normalizedUserId = String(userId);
+  const entry = onlineUsers.get(normalizedUserId);
+  if (!entry) return;
+  entry.socketIds.delete(socketId);
+  if (!entry.socketIds.size) {
+    onlineUsers.delete(normalizedUserId);
+  }
+}
+
 /**
  * Initialise Socket.io with the HTTP server.
  * Call this once from server.js after the http server is created.
@@ -31,7 +56,7 @@ function initSocket(server) {
       const normalizedUserId = String(userId);
       socket.data.userId = normalizedUserId;
       socket.join(`user_${normalizedUserId}`);
-      onlineUsers.set(normalizedUserId, { socketId: socket.id, activeRoomId: null });
+      setUserSocket(normalizedUserId, socket.id);
 
       const existingOnlineUserIds = getOnlineUsers().filter((id) => id !== normalizedUserId);
       if (existingOnlineUserIds.length) {
@@ -74,7 +99,7 @@ function initSocket(server) {
       }
     });
 
-    socket.on('active_room', ({ roomId }, callback) => {
+    const setActiveRoom = (data, callback) => {
       const senderId = socket.data.userId;
       if (!senderId) {
         if (typeof callback === 'function') {
@@ -82,16 +107,18 @@ function initSocket(server) {
         }
         return;
       }
-      const entry = onlineUsers.get(senderId);
+      const roomId = data?.roomId || data?.room || data?.chatRoom || data?.room_id || data?.roomID;
+      const normalizedRoomId = roomId ? String(roomId).trim() : null;
+      const entry = getUserEntry(senderId);
       if (entry) {
-        entry.activeRoomId = roomId || null;
+        entry.activeRoomId = normalizedRoomId;
       }
       if (typeof callback === 'function') {
-        callback({ success: true, roomId: roomId || null });
+        callback({ success: true, roomId: normalizedRoomId });
       }
-    });
+    };
 
-    socket.on('clear_active_room', (callback) => {
+    const clearActiveRoom = (callback) => {
       const senderId = socket.data.userId;
       if (!senderId) {
         if (typeof callback === 'function') {
@@ -99,14 +126,23 @@ function initSocket(server) {
         }
         return;
       }
-      const entry = onlineUsers.get(senderId);
+      const entry = getUserEntry(senderId);
       if (entry) {
         entry.activeRoomId = null;
       }
       if (typeof callback === 'function') {
         callback({ success: true });
       }
-    });
+    };
+
+    socket.on('active_room', setActiveRoom);
+    socket.on('enter_room', setActiveRoom);
+    socket.on('set_active_room', setActiveRoom);
+    socket.on('room_active', setActiveRoom);
+    socket.on('clear_active_room', clearActiveRoom);
+    socket.on('leave_room', clearActiveRoom);
+    socket.on('clear_room', clearActiveRoom);
+    socket.on('room_inactive', clearActiveRoom);
 
     socket.on('chat_message', async (data, callback) => {
       try {
@@ -115,7 +151,8 @@ function initSocket(server) {
           return typeof callback === 'function' && callback({ success: false, error: 'User not joined.' });
         }
 
-        const { roomId, receiverId, message, imageUrl } = data || {};
+        const { roomId: rawRoomId, receiverId, message, imageUrl } = data || {};
+        const roomId = rawRoomId ? String(rawRoomId).trim() : '';
         if (!roomId || !receiverId || (!message && !imageUrl)) {
           return typeof callback === 'function' && callback({ success: false, error: 'roomId, receiverId, and message or imageUrl are required.' });
         }
@@ -190,10 +227,7 @@ function initSocket(server) {
     socket.on('disconnect', () => {
       const userId = socket.data.userId;
       if (userId) {
-        const entry = onlineUsers.get(userId);
-        if (entry && entry.socketId === socket.id) {
-          onlineUsers.delete(userId);
-        }
+        removeUserSocket(userId, socket.id);
         io.emit('presence', { userId, status: 'offline' });
       }
       console.log('disconnected', socket.id);
@@ -212,8 +246,9 @@ function isUserOnline(userId) {
 }
 
 function isUserActiveInRoom(userId, roomId) {
-  const entry = onlineUsers.get(String(userId));
-  return Boolean(entry && entry.activeRoomId && entry.activeRoomId === roomId);
+  const entry = getUserEntry(userId);
+  if (!entry) return false;
+  return Boolean(entry.activeRoomId && String(entry.activeRoomId).trim() === String(roomId).trim());
 }
 
 async function notifyUserMessage(userId, senderId, roomId, messageText) {
@@ -222,10 +257,11 @@ async function notifyUserMessage(userId, senderId, roomId, messageText) {
   }
 
   const ioInstance = getIo();
+  const normalizedRoomId = roomId ? String(roomId).trim() : '';
   const payload = {
     type: 'message',
     fromId: String(senderId),
-    roomId,
+    roomId: normalizedRoomId,
     message: messageText ? String(messageText).slice(0, 120) : 'New message received',
   };
 
