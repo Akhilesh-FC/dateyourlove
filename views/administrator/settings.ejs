@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Settings – DateYourLove</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/admin.css" />
+  <script src="https://cdn.ckeditor.com/4.21.0/standard/ckeditor.js"></script>
+</head>
+<body class="admin-body">
+  <%- include('header') %>
+  <div class="admin-wrapper">
+    <%- include('sidebar') %>
+    <main class="admin-content">
+      <div class="page-header">
+        <div>
+          <h2>Settings</h2>
+          <p>Edit privacy policy, terms, and other text content.</p>
+        </div>
+      </div>
+      <% if (message) { %>
+        <div class="alert alert-success"><%= message %></div>
+      <% } %>
+      <% if (error) { %>
+        <div class="alert alert-danger"><%= error %></div>
+      <% } %>
+      <div class="card-panel table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Name</th>
+              <th>Updated</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% settings.forEach((setting) => { %>
+              <tr>
+                <td><%= setting.type %></td>
+                <td><%= setting.name %></td>
+                <td><%= new Date(setting.updated_at).toLocaleString() %></td>
+                <td>
+                  <button class="btn-primary" type="button" onclick="openEditor('<%= setting.type %>', '<%= setting.name.replace(/'/g, "\\'") %>', '<%= setting.content.replace(/'/g, "\\'").replace(/\n/g, '\\n') %>')">Edit</button>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-panel form-card" id="editorPanel" style="display:none;">
+        <h3>Edit Setting</h3>
+        <form method="POST" action="/admin/settings">
+          <input type="hidden" name="type" id="settingType" />
+          <label for="settingName">Name</label>
+          <input type="text" name="name" id="settingName" required />
+          <label for="settingContent">Content</label>
+          <textarea name="content" id="settingContent" rows="10"></textarea>
+          <button type="submit" class="btn-primary">Save Setting</button>
+          <button type="button" class="btn-secondary" onclick="closeEditor()">Cancel</button>
+        </form>
+      </div>
+    </main>
+  </div>
+  <script>
+    function openEditor(type, name, content) {
+      document.getElementById('settingType').value = type;
+      document.getElementById('settingName').value = name;
+      CKEDITOR.instances.settingContent.setData(content);
+      document.getElementById('editorPanel').style.display = 'block';
+      window.scrollTo(0, document.getElementById('editorPanel').offsetTop);
+    }
+
+    function closeEditor() {
+      document.getElementById('editorPanel').style.display = 'none';
+    }
+
+    window.onload = function() {
+      CKEDITOR.replace('settingContent');
+    };
+  </script>
+</body>
+</html>

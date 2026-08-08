@@ -13,6 +13,7 @@ document.getElementById('connectBtn').addEventListener('click', () => {
   });
   socket.on('liked', (data) => log('You were liked by: ' + data.fromId));
   socket.on('message', (data) => log(`Message from ${data.fromId}: ${data.text}`));
+  socket.on('notification', (data) => log(`Notification: ${JSON.stringify(data)}`));
 });
 
 document.getElementById('likeBtn').addEventListener('click', () => {

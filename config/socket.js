@@ -1,6 +1,7 @@
 const { Server } = require('socket.io');
 const db = require('../config/db');
 const chatService = require('../services/chatService');
+const { messaging } = require('./firebase');
 let io = null;
 const onlineUsers = new Map();
 
@@ -30,7 +31,7 @@ function initSocket(server) {
       const normalizedUserId = String(userId);
       socket.data.userId = normalizedUserId;
       socket.join(`user_${normalizedUserId}`);
-      onlineUsers.set(normalizedUserId, socket.id);
+      onlineUsers.set(normalizedUserId, { socketId: socket.id, activeRoomId: null });
 
       const existingOnlineUserIds = getOnlineUsers().filter((id) => id !== normalizedUserId);
       if (existingOnlineUserIds.length) {
@@ -70,6 +71,40 @@ function initSocket(server) {
 
       if (typeof callback === 'function') {
         callback({ success: true, message: 'Typing event sent', roomId, receiverId, isTyping: Boolean(isTyping) });
+      }
+    });
+
+    socket.on('active_room', ({ roomId }, callback) => {
+      const senderId = socket.data.userId;
+      if (!senderId) {
+        if (typeof callback === 'function') {
+          return callback({ success: false, message: 'You must join before setting the active room' });
+        }
+        return;
+      }
+      const entry = onlineUsers.get(senderId);
+      if (entry) {
+        entry.activeRoomId = roomId || null;
+      }
+      if (typeof callback === 'function') {
+        callback({ success: true, roomId: roomId || null });
+      }
+    });
+
+    socket.on('clear_active_room', (callback) => {
+      const senderId = socket.data.userId;
+      if (!senderId) {
+        if (typeof callback === 'function') {
+          return callback({ success: false, message: 'You must join before clearing the active room' });
+        }
+        return;
+      }
+      const entry = onlineUsers.get(senderId);
+      if (entry) {
+        entry.activeRoomId = null;
+      }
+      if (typeof callback === 'function') {
+        callback({ success: true });
       }
     });
 
@@ -121,6 +156,7 @@ function initSocket(server) {
           ...insertedMessage,
           receiverHasPlan,
         });
+        await notifyUserMessage(Number(receiverId), senderId, roomId, message || (imageUrl ? 'sent a photo' : 'New message received'));
 
         try {
           const summaryForReceiver = await chatService.buildRoomSummary(roomId, Number(receiverId));
@@ -154,7 +190,10 @@ function initSocket(server) {
     socket.on('disconnect', () => {
       const userId = socket.data.userId;
       if (userId) {
-        onlineUsers.delete(userId);
+        const entry = onlineUsers.get(userId);
+        if (entry && entry.socketId === socket.id) {
+          onlineUsers.delete(userId);
+        }
         io.emit('presence', { userId, status: 'offline' });
       }
       console.log('disconnected', socket.id);
@@ -172,8 +211,54 @@ function isUserOnline(userId) {
   return onlineUsers.has(String(userId));
 }
 
+function isUserActiveInRoom(userId, roomId) {
+  const entry = onlineUsers.get(String(userId));
+  return Boolean(entry && entry.activeRoomId && entry.activeRoomId === roomId);
+}
+
+async function notifyUserMessage(userId, senderId, roomId, messageText) {
+  if (isUserActiveInRoom(userId, roomId)) {
+    return false;
+  }
+
+  const ioInstance = getIo();
+  const payload = {
+    type: 'message',
+    fromId: String(senderId),
+    roomId,
+    message: messageText ? String(messageText).slice(0, 120) : 'New message received',
+  };
+
+  if (ioInstance) {
+    ioInstance.to(`user_${userId}`).emit('notification', payload);
+  }
+
+  try {
+    const [rows] = await db.query('SELECT fcm_token FROM users WHERE id = ? LIMIT 1', [userId]);
+    const token = rows[0] ? rows[0].fcm_token : null;
+    if (token) {
+      await messaging.send({
+        token,
+        notification: {
+          title: 'New message',
+          body: payload.message,
+        },
+        data: {
+          type: 'message',
+          roomId,
+          fromId: String(senderId),
+        },
+      });
+    }
+  } catch (err) {
+    console.error('MESSAGE NOTIFICATION ERROR:', err && err.message ? err.message : err);
+  }
+
+  return true;
+}
+
 function getOnlineUsers() {
   return Array.from(onlineUsers.keys());
 }
 
-module.exports = { initSocket, getIo, isUserOnline, getOnlineUsers };
+module.exports = { initSocket, getIo, isUserOnline, getOnlineUsers, isUserActiveInRoom, notifyUserMessage };

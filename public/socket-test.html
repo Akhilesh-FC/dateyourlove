@@ -67,6 +67,11 @@
         <label for="imageUrl">Image URL</label>
         <input id="imageUrl" type="text" placeholder="Optional image URL" />
 
+        <label for="activeRoomId">Active Room ID</label>
+        <input id="activeRoomId" type="text" placeholder="room_2_5" />
+        <button id="activeRoomBtn">Emit active_room</button>
+        <button id="clearActiveRoomBtn" class="secondary">Emit clear_active_room</button>
+
         <button id="sendBtn">Emit chat_message</button>
       </div>
     </div>
@@ -90,6 +95,8 @@
       const joinBtn = document.getElementById('joinBtn');
       const typingBtn = document.getElementById('typingBtn');
       const sendBtn = document.getElementById('sendBtn');
+      const activeRoomBtn = document.getElementById('activeRoomBtn');
+      const clearActiveRoomBtn = document.getElementById('clearActiveRoomBtn');
       const clearLogsBtn = document.getElementById('clearLogsBtn');
       const statusEl = document.getElementById('connectionStatus');
       const logBox = document.getElementById('logBox');
@@ -102,6 +109,7 @@
       const typingModeSelect = document.getElementById('typingMode');
       const messageTextInput = document.getElementById('messageText');
       const imageUrlInput = document.getElementById('imageUrl');
+      const activeRoomIdInput = document.getElementById('activeRoomId');
 
       let socket = null;
 
@@ -162,6 +170,10 @@
           log(`typing event: ${JSON.stringify(data)}`);
         });
 
+        socket.on('notification', (data) => {
+          log(`notification event: ${JSON.stringify(data)}`);
+        });
+
         socket.on('room_update', (data) => {
           log(`room_update event: ${JSON.stringify(data)}`);
         });
@@ -209,6 +221,31 @@
         }
         socket.emit('typing', { roomId, receiverId, isTyping }, (response) => {
           log(`typing ack: ${JSON.stringify(response)}`);
+        });
+      });
+
+      activeRoomBtn.addEventListener('click', () => {
+        if (!socket) {
+          alert('Connect first');
+          return;
+        }
+        const roomId = activeRoomIdInput.value.trim();
+        if (!roomId) {
+          alert('Enter active roomId');
+          return;
+        }
+        socket.emit('active_room', { roomId }, (response) => {
+          log(`active_room ack: ${JSON.stringify(response)}`);
+        });
+      });
+
+      clearActiveRoomBtn.addEventListener('click', () => {
+        if (!socket) {
+          alert('Connect first');
+          return;
+        }
+        socket.emit('clear_active_room', (response) => {
+          log(`clear_active_room ack: ${JSON.stringify(response)}`);
         });
       });
 

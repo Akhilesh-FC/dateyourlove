@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Subscriptions – DateYourLove</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/admin.css" />
+</head>
+<body class="admin-body">
+  <%- include('header') %>
+  <div class="admin-wrapper">
+    <%- include('sidebar') %>
+    <main class="admin-content">
+      <div class="page-header">
+        <div>
+          <h2>Subscriptions</h2>
+          <p>Review user subscriptions, plans, and payment details.</p>
+        </div>
+      </div>
+      <% if (message) { %>
+        <div class="alert alert-success"><%= message %></div>
+      <% } %>
+      <% if (error) { %>
+        <div class="alert alert-danger"><%= error %></div>
+      <% } %>
+      <div class="card-panel table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>User</th>
+              <th>Plan</th>
+              <th>Duration</th>
+              <th>Price Paid</th>
+              <th>Status</th>
+              <th>Start</th>
+              <th>End</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% subscriptions.forEach((subscription) => { %>
+              <tr>
+                <td><%= subscription.id %></td>
+                <td><%= subscription.user_name || subscription.user_email || 'N/A' %></td>
+                <td><%= subscription.plan_name || subscription.plan_name_master || 'N/A' %></td>
+                <td><%= subscription.duration_type || subscription.duration_type_master || 'N/A' %></td>
+                <td><%= subscription.price_paid != null ? subscription.price_paid : (subscription.duration_price != null ? subscription.duration_price : 'N/A') %></td>
+                <td><%= subscription.status %></td>
+                <td><%= subscription.start_date ? new Date(subscription.start_date).toLocaleDateString() : '—' %></td>
+                <td><%= subscription.end_date ? new Date(subscription.end_date).toLocaleDateString() : '—' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

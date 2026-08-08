@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Like Limits – DateYourLove</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/admin.css" />
+</head>
+<body class="admin-body">
+  <%- include('header') %>
+  <div class="admin-wrapper">
+    <%- include('sidebar') %>
+    <main class="admin-content">
+      <div class="page-header">
+        <div>
+          <h2>Like Limits</h2>
+          <p>Manage daily like and superlike limits for user segments.</p>
+        </div>
+      </div>
+      <% if (message) { %>
+        <div class="alert alert-success"><%= message %></div>
+      <% } %>
+      <% if (error) { %>
+        <div class="alert alert-danger"><%= error %></div>
+      <% } %>
+      <form method="POST" action="/admin/like-limits">
+        <div class="card-panel table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Max Likes</th>
+                <th>Max Superlikes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% limits.forEach((limit) => { %>
+                <tr>
+                  <input type="hidden" name="ids" value="<%= limit.id %>">
+                  <td><%= limit.type %></td>
+                  <td><input type="number" name="max_daily_likes" value="<%= limit.max_daily_likes %>" min="0" /></td>
+                  <td><input type="number" name="max_daily_superlikes" value="<%= limit.max_daily_superlikes %>" min="0" /></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+          <button type="submit" class="btn-primary">Save</button>
+        </div>
+      </form>
+    </main>
+  </div>
+</body>
+</html>

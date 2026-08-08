@@ -6,6 +6,11 @@ const router = express.Router();
 
 const adminController = require('../../controllers/Admin/adminController');
 const productAdminController = require('../../controllers/Admin/productAdminController');
+const userAdminController = require('../../controllers/Admin/userAdminController');
+const planAdminController = require('../../controllers/Admin/planAdminController');
+const likeAdminController = require('../../controllers/Admin/likeAdminController');
+const settingAdminController = require('../../controllers/Admin/settingAdminController');
+const subscriptionAdminController = require('../../controllers/Admin/subscriptionAdminController');
 // const comboAdminController = require('../../controllers/Admin/comboOfferAdminController'); // removed - not used
 const auth = require('../../middleware/auth');
 const upload = require('../../middleware/upload'); // multer config for file uploads
@@ -17,8 +22,13 @@ router.get('/logout', adminController.logout);
 
 // Protected dashboard
 router.get('/dashboard', auth, adminController.dashboard);
-router.get('/users', auth, require('../../controllers/Admin/userAdminController').showUsers);
-router.get('/plans', auth, require('../../controllers/Admin/planAdminController').showPlans);
+router.get('/users', auth, userAdminController.showUsers);
+router.get('/plans', auth, planAdminController.showPlans);
+router.get('/subscriptions', auth, subscriptionAdminController.showSubscriptions);
+router.get('/like-limits', auth, likeAdminController.showLikeLimits);
+router.post('/like-limits', auth, likeAdminController.saveLikeLimits);
+router.get('/settings', auth, settingAdminController.showSettings);
+router.post('/settings', auth, settingAdminController.saveSetting);
 router.get('/change-password', auth, adminController.showChangePassword);
 router.post('/change-password', auth, adminController.processChangePassword);
 
