@@ -32,6 +32,10 @@ router.post('/setting', settingsController.upsertSetting);
 
 // Protected routes (require JWT)
 router.get('/profile/me', authMiddleware, userController.getProfile);
+router.get('/profile/share/:targetUserId', authMiddleware, userController.getShareProfileLink);
+router.post('/profile/block', authMiddleware, userController.blockUser);
+router.post('/profile/unblock', authMiddleware, userController.unblockUser);
+router.post('/profile/report', authMiddleware, userController.reportUser);
 router.get('/swipe/feed', authMiddleware, swipeController.getSwipeFeed);
 router.post('/swipe/action', authMiddleware, swipeController.recordSwipeAction);
 router.get('/swipe/matches', authMiddleware, swipeController.getMatches);

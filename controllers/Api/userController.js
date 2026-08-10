@@ -70,6 +70,44 @@ const buildUserPayload = (row) => ({
   updated_at: row.updated_at,
 });
 
+const getUserById = async (userId) => {
+  const [rows] = await db.query('SELECT id, first_name FROM users WHERE id = ?', [userId]);
+  return rows[0] || null;
+};
+
+const buildProfileShareUrl = (userId) => {
+  const baseUrl = (process.env.BASE_URL || 'http://localhost:3001').replace(/\/$/, '');
+  return `${baseUrl}/profile/${userId}`;
+};
+
+const createBlockRelationship = async (blockerId, blockedId) => {
+  await db.query(
+    `INSERT INTO user_blocks (blocker_id, blocked_id)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE created_at = NOW()`,
+    [blockerId, blockedId]
+  );
+};
+
+const removeBlockRelationship = async (blockerId, blockedId) => {
+  const [result] = await db.query(
+    'DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?',
+    [blockerId, blockedId]
+  );
+  return result.affectedRows;
+};
+
+const isUserBlockedBetween = async (userA, userB) => {
+  const [rows] = await db.query(
+    `SELECT 1 FROM user_blocks
+     WHERE (blocker_id = ? AND blocked_id = ?)
+        OR (blocker_id = ? AND blocked_id = ?)
+     LIMIT 1`,
+    [userA, userB, userB, userA]
+  );
+  return rows.length > 0;
+};
+
 const isMockOtpEnabled = () => process.env.OTP_MOCK === 'true';
 
 const generateOtpCode = () => String(Math.floor(1000 + Math.random() * 9000));
@@ -335,6 +373,114 @@ exports.getProfile = async (req, res) => {
   } catch (err) {
     console.error('GET PROFILE ERROR:', err.message);
     return res.status(500).json({ message: 'Unable to fetch profile' });
+  }
+};
+
+exports.getShareProfileLink = async (req, res) => {
+  try {
+    const targetUserId = Number(req.params.targetUserId);
+    if (!targetUserId) {
+      return res.status(400).json({ message: 'targetUserId is required' });
+    }
+
+    const targetUser = await getUserById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Target user not found' });
+    }
+
+    return res.status(200).json({
+      targetUserId,
+      profileUrl: buildProfileShareUrl(targetUserId),
+    });
+  } catch (err) {
+    console.error('GET SHARE PROFILE LINK ERROR:', err.message);
+    return res.status(500).json({ message: 'Unable to build share link' });
+  }
+};
+
+exports.blockUser = async (req, res) => {
+  try {
+    const blockerId = req.user.id;
+    const targetUserId = Number(req.body.targetUserId);
+    if (!targetUserId || targetUserId === blockerId) {
+      return res.status(400).json({ message: 'Valid targetUserId is required' });
+    }
+
+    const targetUser = await getUserById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Target user not found' });
+    }
+
+    await createBlockRelationship(blockerId, targetUserId);
+
+    return res.status(200).json({
+      message: 'User blocked successfully',
+      targetUserId,
+      blocked: true,
+    });
+  } catch (err) {
+    console.error('BLOCK USER ERROR:', err.message);
+    return res.status(500).json({ message: 'Unable to block user' });
+  }
+};
+
+exports.unblockUser = async (req, res) => {
+  try {
+    const blockerId = req.user.id;
+    const targetUserId = Number(req.body.targetUserId);
+    if (!targetUserId || targetUserId === blockerId) {
+      return res.status(400).json({ message: 'Valid targetUserId is required' });
+    }
+
+    const targetUser = await getUserById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Target user not found' });
+    }
+
+    const removed = await removeBlockRelationship(blockerId, targetUserId);
+
+    return res.status(200).json({
+      message: removed ? 'User unblocked successfully' : 'User was not blocked',
+      targetUserId,
+      blocked: false,
+    });
+  } catch (err) {
+    console.error('UNBLOCK USER ERROR:', err.message);
+    return res.status(500).json({ message: 'Unable to unblock user' });
+  }
+};
+
+exports.reportUser = async (req, res) => {
+  try {
+    const reporterId = req.user.id;
+    const targetUserId = Number(req.body.targetUserId);
+    const reason = req.body.reason ? String(req.body.reason).trim() : null;
+    const details = req.body.details ? String(req.body.details).trim() : null;
+
+    if (!targetUserId || targetUserId === reporterId) {
+      return res.status(400).json({ message: 'Valid targetUserId is required' });
+    }
+
+    const targetUser = await getUserById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Target user not found' });
+    }
+
+    const [result] = await db.query(
+      `INSERT INTO user_reports (reporter_id, reported_id, reason, details, created_at)
+       VALUES (?, ?, ?, ?, NOW())`,
+      [reporterId, targetUserId, reason, details]
+    );
+
+    return res.status(201).json({
+      message: 'User reported successfully',
+      reportId: result.insertId,
+      targetUserId,
+      reported: true,
+    });
+  } catch (err) {
+    console.error('REPORT USER ERROR:', err.message);
+    return res.status(500).json({ message: 'Unable to report user' });
   }
 };
 

@@ -41,6 +41,27 @@ CREATE TABLE IF NOT EXISTS user_photos (
   INDEX(user_id)
 );
 
+CREATE TABLE IF NOT EXISTS user_blocks (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  blocker_id INT NOT NULL,
+  blocked_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_block (blocker_id, blocked_id),
+  INDEX idx_blocker (blocker_id),
+  INDEX idx_blocked (blocked_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_reports (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  reporter_id INT NOT NULL,
+  reported_id INT NOT NULL,
+  reason VARCHAR(255) DEFAULT NULL,
+  details TEXT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_reporter (reporter_id),
+  INDEX idx_reported (reported_id)
+);
+
 CREATE TABLE IF NOT EXISTS likes (
   id INT AUTO_INCREMENT PRIMARY KEY,
   from_user INT NOT NULL,

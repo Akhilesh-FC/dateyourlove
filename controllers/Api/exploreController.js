@@ -67,8 +67,14 @@ const buildExploreResponse = async (currentUserId, selectedFilters, limit, offse
        AND id NOT IN (
          SELECT likee_id FROM user_likes WHERE liker_id = ?
        )
+       AND id NOT IN (
+         SELECT blocked_id FROM user_blocks WHERE blocker_id = ?
+       )
+       AND id NOT IN (
+         SELECT blocker_id FROM user_blocks WHERE blocked_id = ?
+       )
      ORDER BY created_at DESC`,
-    [currentUserId, currentUserId]
+    [currentUserId, currentUserId, currentUserId, currentUserId]
   );
 
   const filterMap = {

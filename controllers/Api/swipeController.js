@@ -98,11 +98,17 @@ exports.getSwipeFeed = async (req, res) => {
            WHERE liker_id = ?
              AND status IN ('like', 'superlike', 'unlike')
          )
+       AND u.id NOT IN (
+           SELECT blocked_id FROM user_blocks WHERE blocker_id = ?
+         )
+       AND u.id NOT IN (
+           SELECT blocker_id FROM user_blocks WHERE blocked_id = ?
+         )
          AND u.gender = (CASE WHEN ? = 'female' THEN 'male' ELSE 'female' END)
          AND JSON_CONTAINS(u.interested_in, ?, '$')
        HAVING distance_km <= ?
        ORDER BY distance_km ASC`,
-      [me.lat, me.lng, me.lat, userId, userId, userId, userId, me.gender, JSON.stringify([me.gender]), radiusKm]
+      [me.lat, me.lng, me.lat, userId, userId, userId, userId, userId, userId, me.gender, JSON.stringify([me.gender]), radiusKm]
     );
 
     // Photos for all users in one query (avoids N+1)
