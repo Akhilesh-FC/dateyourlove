@@ -159,12 +159,14 @@ exports.getChatRooms = async (req, res) => {
         otherUser.images = [];
       }
       const lastVideoCall = await chatService.getLastVideoCallBetweenUsers(userId, otherUserId);
+      const userIsBlocked = await isUserBlockedBetween(userId, otherUserId);
       rooms.push({
         roomId: row.room_id,
         otherUser,
         canReply,
         otherUserCanReply,
         active_plan: otherUserCanReply ? 'yes' : 'no',
+        useris_blocked: userIsBlocked ? 'yes' : 'no',
         isOnline: isUserOnline(otherUserId),
         createdAt: row.created_at,
         updatedAt: row.updated_at,
