@@ -2,6 +2,12 @@ const db = require('../../config/db');
 const { buildUserPayload } = require('../../controllers/Api/userController');
 const { toFullUrl } = require('../../utils/appHelpers');
 
+const formatDistanceLabel = (distanceKm) => {
+  if (distanceKm === null || distanceKm === undefined) return '';
+  if (distanceKm < 1) return 'Less than 1 km away';
+  return `${Math.round(distanceKm)} km away`;
+};
+
 const normalizeValue = (value) => {
   if (Array.isArray(value)) {
     return value.filter(Boolean).map((item) => String(item));
@@ -60,22 +66,49 @@ const buildExploreResponse = async (currentUserId, selectedFilters, limit, offse
   }
 
   const me = meRows[0];
-  const [rows] = await db.query(
-    `SELECT * FROM users
-     WHERE id != ?
-       AND is_otp_verified = 1
-       AND id NOT IN (
-         SELECT likee_id FROM user_likes WHERE liker_id = ?
-       )
-       AND id NOT IN (
-         SELECT blocked_id FROM user_blocks WHERE blocker_id = ?
-       )
-       AND id NOT IN (
-         SELECT blocker_id FROM user_blocks WHERE blocked_id = ?
-       )
-     ORDER BY created_at DESC`,
-    [currentUserId, currentUserId, currentUserId, currentUserId]
-  );
+  let rows;
+  const hasLocation = me.lat !== null && me.lat !== undefined && me.lng !== null && me.lng !== undefined;
+  if (hasLocation) {
+    const sql = `SELECT u.*,
+      (6371 * acos(
+         cos(radians(?)) * cos(radians(u.lat)) * cos(radians(u.lng) - radians(?)) +
+         sin(radians(?)) * sin(radians(u.lat))
+      )) AS distance_km
+      FROM users u
+      WHERE id != ?
+        AND is_otp_verified = 1
+        AND id NOT IN (
+          SELECT likee_id FROM user_likes WHERE liker_id = ?
+        )
+        AND id NOT IN (
+          SELECT blocked_id FROM user_blocks WHERE blocker_id = ?
+        )
+        AND id NOT IN (
+          SELECT blocker_id FROM user_blocks WHERE blocked_id = ?
+        )
+      ORDER BY created_at DESC`;
+    const params = [me.lat, me.lng, me.lat, currentUserId, currentUserId, currentUserId, currentUserId];
+    const result = await db.query(sql, params);
+    rows = result[0];
+  } else {
+    const result = await db.query(
+      `SELECT * FROM users
+       WHERE id != ?
+         AND is_otp_verified = 1
+         AND id NOT IN (
+           SELECT likee_id FROM user_likes WHERE liker_id = ?
+         )
+         AND id NOT IN (
+           SELECT blocked_id FROM user_blocks WHERE blocker_id = ?
+         )
+         AND id NOT IN (
+           SELECT blocker_id FROM user_blocks WHERE blocked_id = ?
+         )
+       ORDER BY created_at DESC`,
+      [currentUserId, currentUserId, currentUserId, currentUserId]
+    );
+    rows = result[0];
+  }
 
   const filterMap = {
     looking_for: 'looking_for',
@@ -160,6 +193,12 @@ const buildExploreResponse = async (currentUserId, selectedFilters, limit, offse
     profile.photos = photosByUser[item.user.id] || [];
     profile.matchScore = item.matchScore;
     profile.matchedFields = item.matchedFields;
+    // distance_km is present when current user has location; preserve numeric km with 2 decimals
+    profile.distanceKm = (item.user.distance_km === null || item.user.distance_km === undefined)
+      ? null
+      : Number(Number(item.user.distance_km).toFixed(2));
+    // human-friendly label
+    profile.distance = formatDistanceLabel(item.user.distance_km);
     return profile;
   });
 

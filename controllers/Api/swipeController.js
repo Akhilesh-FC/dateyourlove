@@ -134,6 +134,7 @@ exports.getSwipeFeed = async (req, res) => {
         name: row.first_name || '',
         age: calculateAge(row.dob),
         distance: formatDistanceLabel(row.distance_km),
+        distanceKm: row.distance_km === null || row.distance_km === undefined ? null : Number(Number(row.distance_km).toFixed(2)),
         bio: row.about || '',
         imageUrl: photos[0] || '',
         tag: 'Nearby',
