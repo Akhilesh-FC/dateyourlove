@@ -653,6 +653,44 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+exports.updateLocation = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { lat, lng } = req.body;
+
+    if (lat === undefined || lng === undefined) {
+      return res.status(400).json({ message: 'lat and lng are required in request body' });
+    }
+
+    const latValue = Number(lat);
+    const lngValue = Number(lng);
+
+    if (Number.isNaN(latValue) || Number.isNaN(lngValue)) {
+      return res.status(400).json({ message: 'lat and lng must be valid numbers' });
+    }
+
+    const [existingRows] = await db.query('SELECT id FROM users WHERE id = ? LIMIT 1', [userId]);
+    if (!existingRows.length) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await db.query('UPDATE users SET lat = ?, lng = ?, updated_at = NOW() WHERE id = ?', [latValue, lngValue, userId]);
+
+    const [rows] = await db.query('SELECT * FROM users WHERE id = ? LIMIT 1', [userId]);
+    const profile = buildUserPayload(rows[0]);
+
+    return res.status(200).json({
+      message: 'Location updated successfully',
+      lat: latValue,
+      lng: lngValue,
+      user: profile,
+    });
+  } catch (err) {
+    console.error('UPDATE LOCATION ERROR:', err.message);
+    return res.status(500).json({ message: 'Unable to update location', error: err.message });
+  }
+};
+
 // mobile + otp -> OTP provider se verify hota hai.
 //   - mobile already DB me hai -> LOGIN (baaki fields ignore, agar bheje bhi ho)
 //   - mobile DB me nahi hai -> isi request ke profile fields se REGISTER
