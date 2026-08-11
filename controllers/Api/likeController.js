@@ -293,8 +293,16 @@ exports.getLikedUsers = async (req, res) => {
         profile.lng !== null && profile.lng !== undefined
       ) {
         const distanceKm = calculateDistanceKm(currentLocation.lat, currentLocation.lng, profile.lat, profile.lng);
-        profile.distanceKm = distanceKm === null ? null : Number(Number(distanceKm).toFixed(2));
-        profile.distance = formatDistanceLabel(profile.distanceKm);
+        if (distanceKm === null) {
+          profile.distanceKm = null;
+          profile.distance = '';
+        } else if (distanceKm < 1) {
+          profile.distanceKm = Math.round(distanceKm * 1000);
+          profile.distance = formatDistanceLabel(distanceKm);
+        } else {
+          profile.distanceKm = Number(Number(distanceKm).toFixed(2));
+          profile.distance = formatDistanceLabel(distanceKm);
+        }
       } else {
         profile.distanceKm = null;
         profile.distance = '';
@@ -358,8 +366,16 @@ exports.getMatches = async (req, res) => {
         profile.lng !== null && profile.lng !== undefined
       ) {
         const distanceKm = calculateDistanceKm(currentLocation.lat, currentLocation.lng, profile.lat, profile.lng);
-        profile.distanceKm = distanceKm === null ? null : Number(Number(distanceKm).toFixed(2));
-        profile.distance = formatDistanceLabel(profile.distanceKm);
+        if (distanceKm === null) {
+          profile.distanceKm = null;
+          profile.distance = '';
+        } else if (distanceKm < 1) {
+          profile.distanceKm = Math.round(distanceKm * 1000);
+          profile.distance = formatDistanceLabel(distanceKm);
+        } else {
+          profile.distanceKm = Number(Number(distanceKm).toFixed(2));
+          profile.distance = formatDistanceLabel(distanceKm);
+        }
       } else {
         profile.distanceKm = null;
         profile.distance = '';

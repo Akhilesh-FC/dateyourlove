@@ -1,6 +1,7 @@
 const https = require('https');
 const jwt = require('jsonwebtoken');
 const db = require('../../config/db');
+const { isUserOnline } = require('../../config/socket');
 const { calculateAge, toFullUrl, calculateDistanceKm, formatDistanceLabel } = require('../../utils/appHelpers');
 
 const MOBILE_REGEX = /^[0-9]{10}$/;
@@ -68,6 +69,7 @@ const buildUserPayload = (row) => ({
   distance_preferred: row.distance_preferred,
   created_at: row.created_at,
   updated_at: row.updated_at,
+  is_active: isUserOnline(row.id),
 });
 
 const attachDistanceFields = (currentLocation, profile) => {
@@ -90,8 +92,16 @@ const attachDistanceFields = (currentLocation, profile) => {
     profile.lng
   );
 
-  profile.distanceKm = distanceKm === null ? null : Number(Number(distanceKm).toFixed(2));
-  profile.distance = formatDistanceLabel(profile.distanceKm);
+  if (distanceKm === null) {
+    profile.distanceKm = null;
+    profile.distance = '';
+  } else if (distanceKm < 1) {
+    profile.distanceKm = Math.round(distanceKm * 1000);
+    profile.distance = formatDistanceLabel(distanceKm);
+  } else {
+    profile.distanceKm = Number(Number(distanceKm).toFixed(2));
+    profile.distance = formatDistanceLabel(distanceKm);
+  }
   return profile;
 };
 

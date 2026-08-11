@@ -1,9 +1,16 @@
 ﻿const { Server } = require('socket.io');
 const db = require('../config/db');
-const chatService = require('../services/chatService');
 const { messaging } = require('./firebase');
 let io = null;
+let chatService = null;
 const onlineUsers = new Map();
+
+const getChatService = () => {
+  if (!chatService) {
+    chatService = require('../services/chatService');
+  }
+  return chatService;
+};
 
 function getUserEntry(userId) {
   const normalizedUserId = String(userId);
@@ -211,18 +218,19 @@ function initSocket(server) {
           return typeof callback === 'function' && callback({ success: false, error: 'roomId, receiverId, and message or imageUrl are required.' });
         }
 
-        const room = await chatService.getRoomForUser(roomId, senderId);
+        const service = getChatService();
+        const room = await service.getRoomForUser(roomId, senderId);
         if (!room) {
           return typeof callback === 'function' && callback({ success: false, error: 'Chat room not found or access denied.' });
         }
 
-        const senderHasPlan = await chatService.userHasActiveSubscription(senderId);
+        const senderHasPlan = await service.userHasActiveSubscription(senderId);
         if (!senderHasPlan) {
           return typeof callback === 'function' && callback({ success: false, error: 'You need an active plan to send messages.' });
         }
 
-        const receiverHasPlan = await chatService.userHasActiveSubscription(Number(receiverId));
-        const insertedMessage = await chatService.insertChatMessage({
+        const receiverHasPlan = await service.userHasActiveSubscription(Number(receiverId));
+        const insertedMessage = await service.insertChatMessage({
           roomId,
           senderId,
           receiverId: Number(receiverId),
@@ -252,8 +260,9 @@ function initSocket(server) {
         await notifyUserMessage(Number(receiverId), senderId, roomId, message || (imageUrl ? 'sent a photo' : 'New message received'));
 
         try {
-          const summaryForReceiver = await chatService.buildRoomSummary(roomId, Number(receiverId));
-          const summaryForSender = await chatService.buildRoomSummary(roomId, Number(senderId));
+          const service = getChatService();
+          const summaryForReceiver = await service.buildRoomSummary(roomId, Number(receiverId));
+          const summaryForSender = await service.buildRoomSummary(roomId, Number(senderId));
           if (summaryForReceiver) {
             summaryForReceiver.isOnline = isUserOnline(senderId);
             io.to(`user_${receiverId}`).emit('room_update', summaryForReceiver);

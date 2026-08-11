@@ -194,9 +194,13 @@ const buildExploreResponse = async (currentUserId, selectedFilters, limit, offse
     profile.matchScore = item.matchScore;
     profile.matchedFields = item.matchedFields;
     // distance_km is present when current user has location; preserve numeric km with 2 decimals
-    profile.distanceKm = (item.user.distance_km === null || item.user.distance_km === undefined)
-      ? null
-      : Number(Number(item.user.distance_km).toFixed(2));
+    if (item.user.distance_km === null || item.user.distance_km === undefined) {
+      profile.distanceKm = null;
+    } else if (item.user.distance_km < 1) {
+      profile.distanceKm = Math.round(item.user.distance_km * 1000);
+    } else {
+      profile.distanceKm = Number(Number(item.user.distance_km).toFixed(2));
+    }
     // human-friendly label
     profile.distance = formatDistanceLabel(item.user.distance_km);
     return profile;

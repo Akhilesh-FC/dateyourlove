@@ -47,7 +47,8 @@ const calculateDistanceKm = (lat1, lng1, lat2, lng2) => {
 
 const formatDistanceLabel = (distanceKm) => {
   if (distanceKm === null || distanceKm === undefined) return '';
-  if (distanceKm < 1) return 'Less than 1 km away';
+  if (distanceKm <= 0) return '0 m away';
+  if (distanceKm < 1) return `${Math.round(distanceKm * 1000)} m away`;
   return `${Math.round(distanceKm)} km away`;
 };
 

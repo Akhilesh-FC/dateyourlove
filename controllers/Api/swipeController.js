@@ -1,7 +1,7 @@
 const db = require('../../config/db');
-const { calculateAge, toFullUrl } = require('../../utils/appHelpers');
+const { calculateAge, toFullUrl, formatDistanceLabel } = require('../../utils/appHelpers');
 const { messaging } = require('../../config/firebase');
-const { getIo } = require('../../config/socket');
+const { getIo, isUserOnline } = require('../../config/socket');
 const { buildUserPayload } = require('../../controllers/Api/userController');
 
 const safeParseJson = (value, fallback) => {
@@ -24,12 +24,6 @@ const formatHeightLabel = (heightCm) => {
   const feet = Math.floor(totalInches / 12);
   const inches = totalInches % 12;
   return inches > 0 ? `${feet}ft ${inches}in height` : `${feet}ft height`;
-};
-
-const formatDistanceLabel = (distanceKm) => {
-  if (distanceKm === null || distanceKm === undefined) return '';
-  if (distanceKm < 1) return 'Less than 1 km away';
-  return `${Math.round(distanceKm)} km away`;
 };
 
 // ---------- GET /api/swipe/feed (protected - Authorization: Bearer <token>) ----------
@@ -134,7 +128,8 @@ exports.getSwipeFeed = async (req, res) => {
         name: row.first_name || '',
         age: calculateAge(row.dob),
         distance: formatDistanceLabel(row.distance_km),
-        distanceKm: row.distance_km === null || row.distance_km === undefined ? null : Number(Number(row.distance_km).toFixed(2)),
+        distanceKm: row.distance_km === null || row.distance_km === undefined ? null : (row.distance_km < 1 ? Math.round(row.distance_km * 1000) : Number(Number(row.distance_km).toFixed(2))),
+        is_active: isUserOnline(row.id),
         bio: row.about || '',
         imageUrl: photos[0] || '',
         tag: 'Nearby',
