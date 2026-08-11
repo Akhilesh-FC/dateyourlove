@@ -164,6 +164,7 @@ exports.getChatRooms = async (req, res) => {
         otherUser,
         canReply,
         otherUserCanReply,
+        active_plan: otherUserCanReply ? 'yes' : 'no',
         isOnline: isUserOnline(otherUserId),
         createdAt: row.created_at,
         updatedAt: row.updated_at,
