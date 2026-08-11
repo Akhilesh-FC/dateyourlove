@@ -16,6 +16,12 @@ exports.requestCall = async (req, res) => {
     const callerHasPlan = await chatService.userHasActiveSubscription(callerId);
     if (!callerHasPlan) return res.status(403).json({ message: 'Active subscription required' });
 
+    const { isUserBlockedBetween } = require('../../utils/blockHelpers');
+    const blocked = await isUserBlockedBetween(callerId, calleeId);
+    if (blocked) {
+      return res.status(403).json({ message: 'Call cannot be requested because one user has blocked the other.' });
+    }
+
     await callService.cleanupExpiredRingingCalls();
 
     const callerActiveCall = await callService.isUserInActiveCall(callerId);

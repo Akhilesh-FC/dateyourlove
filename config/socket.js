@@ -229,6 +229,12 @@ function initSocket(server) {
           return typeof callback === 'function' && callback({ success: false, error: 'You need an active plan to send messages.' });
         }
 
+        const { isUserBlockedBetween } = require('../utils/blockHelpers');
+        const blocked = await isUserBlockedBetween(senderId, Number(receiverId));
+        if (blocked) {
+          return typeof callback === 'function' && callback({ success: false, error: 'Cannot send message because one user has blocked the other.' });
+        }
+
         const receiverHasPlan = await service.userHasActiveSubscription(Number(receiverId));
         const insertedMessage = await service.insertChatMessage({
           roomId,

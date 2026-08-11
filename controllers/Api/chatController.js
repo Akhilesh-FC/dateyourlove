@@ -3,6 +3,7 @@ const { buildUserPayload } = require('../../controllers/Api/userController');
 const { toFullUrl } = require('../../utils/appHelpers');
 const { getIo, isUserOnline, isUserActiveInRoom, notifyUserMessage } = require('../../config/socket');
 const chatService = require('../../services/chatService');
+const { isUserBlockedBetween } = require('../../utils/blockHelpers');
 
 async function userHasActiveSubscription(userId) {
   const [rows] = await db.query(
@@ -239,6 +240,11 @@ exports.sendMessage = async (req, res) => {
     const senderHasPlan = await chatService.userHasActiveSubscription(senderId);
     if (!senderHasPlan) {
       return res.status(403).json({ message: 'You need an active plan to send messages.' });
+    }
+
+    const blocked = await isUserBlockedBetween(senderId, Number(receiverId));
+    if (blocked) {
+      return res.status(403).json({ message: 'Message cannot be sent because one user has blocked the other.' });
     }
 
     const receiverHasPlan = await chatService.userHasActiveSubscription(Number(receiverId));
