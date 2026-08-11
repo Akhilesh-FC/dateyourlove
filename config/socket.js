@@ -263,7 +263,9 @@ function initSocket(server) {
           receiverHasPlan,
           suppressNotification,
         });
-        await notifyUserMessage(Number(receiverId), senderId, roomId, message || (imageUrl ? 'sent a photo' : 'New message received'));
+        if (!suppressNotification) {
+          await notifyUserMessage(Number(receiverId), senderId, roomId, message || (imageUrl ? 'sent a photo' : 'New message received'));
+        }
 
         try {
           const service = getChatService();

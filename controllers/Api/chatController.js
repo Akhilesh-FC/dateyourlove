@@ -272,7 +272,9 @@ exports.sendMessage = async (req, res) => {
     let delivered = false;
     if (io) {
       io.to(`user_${receiverId}`).emit('message', payload);
-      await notifyUserMessage(Number(receiverId), senderId, roomId, message || (imageUrl ? 'sent a photo' : 'New message received'));
+      if (!payload.suppressNotification) {
+        await notifyUserMessage(Number(receiverId), senderId, roomId, message || (imageUrl ? 'sent a photo' : 'New message received'));
+      }
       if (isUserOnline(Number(receiverId))) {
         await db.query(`UPDATE chat_messages SET is_delivered = 1 WHERE id = ?`, [insertedMessage.id]);
         delivered = true;
