@@ -1,7 +1,7 @@
 const https = require('https');
 const jwt = require('jsonwebtoken');
 const db = require('../../config/db');
-const { calculateAge, toFullUrl } = require('../../utils/appHelpers');
+const { calculateAge, toFullUrl, calculateDistanceKm, formatDistanceLabel } = require('../../utils/appHelpers');
 
 const MOBILE_REGEX = /^[0-9]{10}$/;
 const otpStore = new Map();
@@ -69,6 +69,31 @@ const buildUserPayload = (row) => ({
   created_at: row.created_at,
   updated_at: row.updated_at,
 });
+
+const attachDistanceFields = (currentLocation, profile) => {
+  if (
+    !currentLocation ||
+    currentLocation.lat === null || currentLocation.lat === undefined ||
+    currentLocation.lng === null || currentLocation.lng === undefined ||
+    profile.lat === null || profile.lat === undefined ||
+    profile.lng === null || profile.lng === undefined
+  ) {
+    profile.distanceKm = null;
+    profile.distance = '';
+    return profile;
+  }
+
+  const distanceKm = calculateDistanceKm(
+    currentLocation.lat,
+    currentLocation.lng,
+    profile.lat,
+    profile.lng
+  );
+
+  profile.distanceKm = distanceKm === null ? null : Number(Number(distanceKm).toFixed(2));
+  profile.distance = formatDistanceLabel(profile.distanceKm);
+  return profile;
+};
 
 const getUserById = async (userId) => {
   const [rows] = await db.query('SELECT id, first_name FROM users WHERE id = ?', [userId]);
@@ -368,6 +393,8 @@ exports.getProfile = async (req, res) => {
 
     const profile = buildUserPayload(rows[0]);
     profile.photos = photoRows.map((p) => ({ id: p.id, url: toFullUrl(p.url) }));
+
+    attachDistanceFields({ lat: profile.lat, lng: profile.lng }, profile);
 
     return res.status(200).json({ user: profile });
   } catch (err) {

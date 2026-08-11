@@ -1,7 +1,7 @@
 const db = require('../../config/db');
 const { messaging } = require('../../config/firebase'); // Firebase Admin messaging
 const { getIo } = require('../../config/socket'); // socket.io getter
-const { toFullUrl } = require('../../utils/appHelpers');
+const { toFullUrl, calculateDistanceKm, formatDistanceLabel } = require('../../utils/appHelpers');
 const { buildUserPayload } = require('../../controllers/Api/userController');
 const { ensureChatRoomForUsers } = require('../../controllers/Api/chatController');
 
@@ -278,9 +278,27 @@ exports.getLikedUsers = async (req, res) => {
       if (!photosByUser[p.user_id]) photosByUser[p.user_id] = [];
       photosByUser[p.user_id].push({ id: p.id, url: toFullUrl(p.url) });
     });
+    const [meRows] = await db.query('SELECT lat, lng FROM users WHERE id = ? LIMIT 1', [likerId]);
+    const currentLocation = meRows[0] || null;
+
     const likedProfiles = users.map(u => {
       const profile = buildUserPayload(u);
       profile.photos = photosByUser[u.id] || [];
+
+      if (
+        currentLocation &&
+        currentLocation.lat !== null && currentLocation.lat !== undefined &&
+        currentLocation.lng !== null && currentLocation.lng !== undefined &&
+        profile.lat !== null && profile.lat !== undefined &&
+        profile.lng !== null && profile.lng !== undefined
+      ) {
+        const distanceKm = calculateDistanceKm(currentLocation.lat, currentLocation.lng, profile.lat, profile.lng);
+        profile.distanceKm = distanceKm === null ? null : Number(Number(distanceKm).toFixed(2));
+        profile.distance = formatDistanceLabel(profile.distanceKm);
+      } else {
+        profile.distanceKm = null;
+        profile.distance = '';
+      }
       return profile;
     });
     return res.status(200).json({ likedUsers: likedProfiles, isPlanActive });
@@ -325,9 +343,27 @@ exports.getMatches = async (req, res) => {
       photosByUser[p.user_id].push({ id: p.id, url: toFullUrl(p.url) });
     });
 
+    const [meRows] = await db.query('SELECT lat, lng FROM users WHERE id = ? LIMIT 1', [userId]);
+    const currentLocation = meRows[0] || null;
+
     const matches = rows.map((row) => {
       const profile = buildUserPayload(row);
       profile.photos = photosByUser[row.id] || [];
+
+      if (
+        currentLocation &&
+        currentLocation.lat !== null && currentLocation.lat !== undefined &&
+        currentLocation.lng !== null && currentLocation.lng !== undefined &&
+        profile.lat !== null && profile.lat !== undefined &&
+        profile.lng !== null && profile.lng !== undefined
+      ) {
+        const distanceKm = calculateDistanceKm(currentLocation.lat, currentLocation.lng, profile.lat, profile.lng);
+        profile.distanceKm = distanceKm === null ? null : Number(Number(distanceKm).toFixed(2));
+        profile.distance = formatDistanceLabel(profile.distanceKm);
+      } else {
+        profile.distanceKm = null;
+        profile.distance = '';
+      }
       return profile;
     });
 
