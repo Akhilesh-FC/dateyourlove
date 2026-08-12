@@ -121,6 +121,7 @@ exports.getSwipeFeed = async (req, res) => {
         userId,
         userId,
         userId,
+        userId,
         me.gender,
         JSON.stringify([me.gender]),
         radiusKm,
