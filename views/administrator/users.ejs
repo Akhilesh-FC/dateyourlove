@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Users – DateYourLove</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/css/admin.css" />
 </head>
 <body class="admin-body">
@@ -12,93 +12,134 @@
   <div class="admin-wrapper">
     <%- include('sidebar') %>
     <main class="admin-content">
+
       <div class="page-header">
         <div>
           <h2>Users</h2>
-          <p>Latest user registrations and contact details.</p>
+          <p>All registered users with plan and contact details.</p>
         </div>
+        <span class="badge" style="font-size:0.85rem;padding:0.45rem 1rem;">Total: <%= totalUsers %></span>
       </div>
+
       <div class="card-panel table-card">
-        <h3>Recent Users</h3>
-        <table>
+        <% if (!users.length) { %>
+          <p style="color:#6b7280;text-align:center;padding:2rem 0;">No users found.</p>
+        <% } else { %>
+        <table class="styled-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Email</th>
+              <th>#</th>
+              <th>User</th>
               <th>Mobile</th>
-              <th>Name</th>
-              <th>Current Plan</th>
-              <th>Plan Status</th>
-              <th>Joined</th><th>Actions</th>
+              <th>Email</th>
+              <th>Plan</th>
+              <th>Status</th>
+              <th>Joined</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            <% users.forEach((user) => { %>
-              <tr>
-                <td><a href="/admin/users/<%= user.id %>"><%= user.id %></a></td>
-                <td><%= user.email || 'N/A' %></td>
-                <td><%= user.mobile || 'N/A' %></td>
-                <td><%= user.first_name || '—' %></td>
-                <td><%= user.current_plan_name || 'None' %></td>
-                <td><%= user.current_plan_status || 'None' %></td>
-                <td><%= new Date(user.created_at).toLocaleString() %></td>
-                 <td>
-                   <button type="button" class="icon-button view-btn" data-id="<%= user.id %>" data-photo="<%= user.photo_url || '' %>" data-email="<%= user.email %>" data-mobile="<%= user.mobile %>" data-name="<%= user.first_name %>" data-plan="<%= user.current_plan_name %>" data-status="<%= user.current_plan_status %>" data-joined="<%= new Date(user.created_at).toLocaleString() %>">👁️</button>
-                 </td>
-               </tr>
+            <% users.forEach((user, i) => {
+              const initials = (user.first_name || '?')[0].toUpperCase();
+              const statusClass = user.current_plan_status === 'active' ? 'status-active' : user.current_plan_status === 'expired' ? 'status-expired' : 'status-inactive';
+            %>
+              <tr class="user-row" data-uid="<%= user.id %>">
+                <td style="color:#9ca3af;font-size:0.8rem;"><%= user.id %></td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:0.65rem;">
+                    <% if (user.photo_url) { %>
+                      <img src="<%= user.photo_url %>" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid #fecaca;" />
+                    <% } else { %>
+                      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#E8283F,#A80F22);display:grid;place-items:center;color:#fff;font-weight:700;font-size:0.85rem;flex-shrink:0;"><%= initials %></div>
+                    <% } %>
+                    <span style="font-weight:600;color:#111827;"><%= user.first_name || '—' %></span>
+                  </div>
+                </td>
+                <td><%= user.mobile || '—' %></td>
+                <td style="color:#6b7280;"><%= user.email || '—' %></td>
+                <td><%= user.current_plan_name || 'Free' %></td>
+                <td>
+                  <% if (user.current_plan_status) { %>
+                    <span class="status-badge <%= statusClass %>"><%= user.current_plan_status %></span>
+                  <% } else { %>
+                    <span style="color:#9ca3af;font-size:0.8rem;">—</span>
+                  <% } %>
+                </td>
+                <td style="color:#6b7280;font-size:0.8rem;white-space:nowrap;"><%= new Date(user.created_at).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'}) %></td>
+                <td>
+                  <button class="tbl-btn view-toggle" data-uid="<%= user.id %>"
+                    data-photo="<%= user.photo_url || '' %>"
+                    data-name="<%= user.first_name || '—' %>"
+                    data-email="<%= user.email || '—' %>"
+                    data-mobile="<%= user.mobile || '—' %>"
+                    data-plan="<%= user.current_plan_name || 'Free' %>"
+                    data-status="<%= user.current_plan_status || '—' %>"
+                    data-joined="<%= new Date(user.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) %>"
+                    data-gender="<%= user.gender || '—' %>"
+                    data-dob="<%= user.dob ? new Date(user.dob).toLocaleDateString('en-IN') : '—' %>"
+                    data-about="<%= (user.about || '—').replace(/\"/g,'&quot;') %>"
+                    title="View details">👁️</button>
+                </td>
+              </tr>
+              <tr class="detail-row" id="detail-<%= user.id %>" style="display:none;">
+                <td colspan="8">
+                  <div class="detail-row-inner">
+                    <% if (user.photo_url) { %>
+                      <img src="<%= user.photo_url %>" class="detail-avatar" alt="<%= user.first_name %>" />
+                    <% } else { %>
+                      <div class="detail-avatar-placeholder"><%= initials %></div>
+                    <% } %>
+                    <div class="detail-grid">
+                      <div class="detail-item"><label>Full Name</label><span><%= user.first_name || '—' %></span></div>
+                      <div class="detail-item"><label>Mobile</label><span><%= user.mobile || '—' %></span></div>
+                      <div class="detail-item"><label>Email</label><span><%= user.email || '—' %></span></div>
+                      <div class="detail-item"><label>Gender</label><span><%= user.gender || '—' %></span></div>
+                      <div class="detail-item"><label>Date of Birth</label><span><%= user.dob ? new Date(user.dob).toLocaleDateString('en-IN') : '—' %></span></div>
+                      <div class="detail-item"><label>Plan</label><span><%= user.current_plan_name || 'Free' %></span></div>
+                      <div class="detail-item"><label>Plan Status</label><span><%= user.current_plan_status || '—' %></span></div>
+                      <div class="detail-item"><label>OTP Verified</label><span><%= user.is_otp_verified ? '✅ Yes' : '❌ No' %></span></div>
+                      <div class="detail-item"><label>Joined</label><span><%= new Date(user.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) %></span></div>
+                      <div class="detail-item" style="grid-column:1/-1;"><label>About</label><span><%= user.about || '—' %></span></div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
             <% }); %>
           </tbody>
-         </table>
+        </table>
 
-        <!-- User Detail Modal -->
-        <div class="modal-overlay" id="profileModal">
-          <div class="modal-card">
-            <h3>User Profile</h3>
-            <div id="profileContent"></div>
-            <div class="form-actions">
-              <button type="button" class="btn-primary" id="profileClose">Close</button>
-            </div>
-          </div>
+        <div class="pagination">
+          <% if (page > 1) { %>
+            <a href="/admin/users?page=<%= page - 1 %>" class="pagination-link">← Prev</a>
+          <% } %>
+          <span class="pagination-info">Page <%= page %> of <%= totalPages %></span>
+          <% if (page < totalPages) { %>
+            <a href="/admin/users?page=<%= page + 1 %>" class="pagination-link">Next →</a>
+          <% } %>
         </div>
-
-        <script>
-          const profileModal = document.getElementById('profileModal');
-          const profileContent = document.getElementById('profileContent');
-          const closeBtn = document.getElementById('profileClose');
-          document.querySelectorAll('.view-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-              const html = `
-                <img src="${btn.dataset.photo}" alt="User Photo" style="width:100px;height:100px;border-radius:50%;margin-bottom:1rem;"/>
-                <p><strong>ID:</strong> ${btn.dataset.id}</p>
-                <p><strong>Email:</strong> ${btn.dataset.email}</p>
-                <p><strong>Mobile:</strong> ${btn.dataset.mobile}</p>
-                <p><strong>Name:</strong> ${btn.dataset.name}</p>
-                <p><strong>Plan:</strong> ${btn.dataset.plan}</p>
-                <p><strong>Status:</strong> ${btn.dataset.status}</p>
-                <p><strong>Joined:</strong> ${btn.dataset.joined}</p>
-              `;
-              profileContent.innerHTML = html;
-              profileModal.style.display = 'flex';
-            });
-          });
-          closeBtn.addEventListener('click', () => { profileModal.style.display = 'none'; });
-          profileModal.addEventListener('click', e => { if (e.target === profileModal) profileModal.style.display = 'none'; });
-        </script>
-        <% if (!users.length) { %>
-          <p>No users found.</p>
-        <% } else { %>
-          <div class="pagination">
-            <% if (page > 1) { %>
-              <a href="/admin/users?page=<%= page - 1 %>" class="pagination-link">Previous</a>
-            <% } %>
-            <span class="pagination-info">Page <%= page %> of <%= totalPages %></span>
-            <% if (page < totalPages) { %>
-              <a href="/admin/users?page=<%= page + 1 %>" class="pagination-link">Next</a>
-            <% } %>
-          </div>
         <% } %>
       </div>
+
     </main>
   </div>
+
+  <script>
+    document.querySelectorAll('.view-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const uid = btn.dataset.uid;
+        const detailRow = document.getElementById('detail-' + uid);
+        const isOpen = detailRow.style.display !== 'none';
+
+        // close all others
+        document.querySelectorAll('.detail-row').forEach(r => r.style.display = 'none');
+        document.querySelectorAll('.tbl-btn.view-toggle').forEach(b => b.classList.remove('active-view'));
+
+        if (!isOpen) {
+          detailRow.style.display = 'table-row';
+          btn.classList.add('active-view');
+        }
+      });
+    });
+  </script>
 </body>
 </html>

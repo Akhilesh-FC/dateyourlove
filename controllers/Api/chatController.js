@@ -5,6 +5,17 @@ const { getIo, isUserOnline, isUserActiveInRoom, notifyUserMessage } = require('
 const chatService = require('../../services/chatService');
 const { isUserBlockedBetween } = require('../../utils/blockHelpers');
 
+async function isUserBlockedBy(userA, userB) {
+  const [rows] = await db.query(
+    `SELECT 1 FROM user_blocks
+     WHERE blocker_id = ?
+       AND blocked_id = ?
+     LIMIT 1`,
+    [userA, userB]
+  );
+  return rows.length > 0;
+}
+
 async function userHasActiveSubscription(userId) {
   const [rows] = await db.query(
     `SELECT COUNT(*) AS count
@@ -171,6 +182,7 @@ exports.getChatRooms = async (req, res) => {
       }
       const lastVideoCall = await chatService.getLastVideoCallBetweenUsers(userId, otherUserId);
       const userIsBlocked = await isUserBlockedBetween(userId, otherUserId);
+      const userIsBlockedByOther = await isUserBlockedBy(otherUserId, userId);
       const userIsReported = await userHasReported(userId, otherUserId);
       rooms.push({
         roomId: row.room_id,
@@ -179,6 +191,7 @@ exports.getChatRooms = async (req, res) => {
         otherUserCanReply,
         active_plan: otherUserCanReply ? 'yes' : 'no',
         useris_blocked: userIsBlocked ? 'yes' : 'no',
+        isBlockedByOther: userIsBlockedByOther ? 'yes' : 'no',
         is_report: userIsReported ? 'yes' : 'no',
         isOnline: isUserOnline(otherUserId),
         createdAt: row.created_at,

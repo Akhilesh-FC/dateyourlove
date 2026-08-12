@@ -11,7 +11,9 @@ exports.showUsers = async (req, res) => {
     const totalPages = Math.max(1, Math.ceil(totalUsers / limit));
 
     const [users] = await db.query(
-      `SELECT u.*, us.plan_name AS current_plan_name, us.duration_type AS current_plan_duration, us.status AS current_plan_status
+      `SELECT u.*,
+         (SELECT url FROM user_photos WHERE user_id = u.id ORDER BY id ASC LIMIT 1) AS photo_url,
+         us.plan_name AS current_plan_name, us.duration_type AS current_plan_duration, us.status AS current_plan_status
        FROM users u
        LEFT JOIN user_subscriptions us ON us.id = (
          SELECT id FROM user_subscriptions WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1
@@ -47,7 +49,12 @@ exports.showUserDetail = async (req, res) => {
     const userId = Number(req.params.id);
     if (!userId) throw new Error('Invalid user id');
 
-    const [[userRow]] = await db.query('SELECT * FROM users WHERE id = ? LIMIT 1', [userId]);
+    const [[userRow]] = await db.query(
+      `SELECT u.*,
+         (SELECT url FROM user_photos WHERE user_id = u.id ORDER BY id ASC LIMIT 1) AS photo_url
+       FROM users u WHERE u.id = ? LIMIT 1`,
+      [userId]
+    );
     if (!userRow) {
       return res.render('administrator/user-detail', { admin: req.session.admin, user: null, subscriptions: [], error: 'User not found', activePage: 'users' });
     }

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin User Detail – DateYourLove</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <title>User Detail – DateYourLove Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/css/admin.css" />
 </head>
 <body class="admin-body">
@@ -12,60 +12,83 @@
   <div class="admin-wrapper">
     <%- include('sidebar') %>
     <main class="admin-content">
+
       <div class="page-header">
         <div>
+          <a href="/admin/users" style="font-size:0.8rem;color:#6b7280;text-decoration:none;display:inline-flex;align-items:center;gap:0.3rem;margin-bottom:0.4rem;">← Back to Users</a>
           <h2>User Detail</h2>
-          <p>Full profile and subscription history for this user.</p>
+          <p>Full profile and subscription history.</p>
         </div>
       </div>
+
       <% if (error) { %>
         <div class="alert alert-danger"><%= error %></div>
       <% } else if (!user) { %>
         <div class="alert alert-danger">User not found.</div>
       <% } else { %>
-        <div class="card-panel table-card">
-          <table>
-            <tbody>
-              <tr><th>ID</th><td><%= user.id %></td></tr>
-              <tr><th>Email</th><td><%= user.email %></td></tr>
-              <tr><th>Mobile</th><td><%= user.mobile %></td></tr>
-              <tr><th>Name</th><td><%= user.first_name %></td></tr>
-              <tr><th>About</th><td><%= user.about || '—' %></td></tr>
-              <tr><th>DOB</th><td><%= user.dob ? new Date(user.dob).toLocaleDateString() : '—' %></td></tr>
-              <tr><th>Gender</th><td><%= user.gender || '—' %></td></tr>
-              <tr><th>Pronouns</th><td><%= user.pronouns || '—' %></td></tr>
-              <tr><th>Interested In</th><td><%= user.interested_in || '—' %></td></tr>
-              <tr><th>Height (cm)</th><td><%= user.height_cm || '—' %></td></tr>
-              <tr><th>Relationship Type</th><td><%= user.relationship_type || '—' %></td></tr>
-              <tr><th>Open To</th><td><%= user.open_to || '—' %></td></tr>
-              <tr><th>Religion</th><td><%= user.religion || '—' %></td></tr>
-              <tr><th>Zodiac</th><td><%= user.zodiac || '—' %></td></tr>
-              <tr><th>Education</th><td><%= user.education || '—' %></td></tr>
-              <tr><th>Family Plan</th><td><%= user.family_plan || '—' %></td></tr>
-              <tr><th>Communication Style</th><td><%= user.communication_style || '—' %></td></tr>
-              <tr><th>Love Style</th><td><%= user.love_style || '—' %></td></tr>
-              <tr><th>Pets</th><td><%= user.pets || '—' %></td></tr>
-              <tr><th>Prompt</th><td><%= user.prompt || '—' %></td></tr>
-              <tr><th>Job</th><td><%= user.job || '—' %></td></tr>
-              <tr><th>Languages</th><td><%= user.languages || '—' %></td></tr>
-              <tr><th>Smoking</th><td><%= user.lifestyle_smoking || '—' %></td></tr>
-              <tr><th>Drinking</th><td><%= user.lifestyle_drinking || '—' %></td></tr>
-              <tr><th>Workout</th><td><%= user.lifestyle_workout || '—' %></td></tr>
-              <tr><th>Diet</th><td><%= user.diet || '—' %></td></tr>
-              <tr><th>Lat/Lng</th><td><%= user.lat && user.lng ? `${user.lat}, ${user.lng}` : '—' %></td></tr>
-              <tr><th>Distance Preferred</th><td><%= user.distance_preferred || '—' %></td></tr>
-              <tr><th>OTP Verified</th><td><%= user.is_otp_verified ? 'Yes' : 'No' %></td></tr>
-              <tr><th>Created</th><td><%= new Date(user.created_at).toLocaleString() %></td></tr>
-              <tr><th>Updated</th><td><%= new Date(user.updated_at).toLocaleString() %></td></tr>
-            </tbody>
-          </table>
+
+        <div class="card-panel" style="margin-bottom:1rem;">
+          <div style="display:flex;align-items:center;gap:1.25rem;margin-bottom:1.5rem;">
+            <% if (user.photo_url) { %>
+              <img src="<%= user.photo_url %>" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid #fecaca;" />
+            <% } else { %>
+              <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#E8283F,#A80F22);display:grid;place-items:center;color:#fff;font-size:1.75rem;font-weight:700;flex-shrink:0;">
+                <%= (user.first_name || '?')[0].toUpperCase() %>
+              </div>
+            <% } %>
+            <div>
+              <div style="font-size:1.2rem;font-weight:700;color:#111827;"><%= user.first_name || '—' %></div>
+              <div style="font-size:0.875rem;color:#6b7280;"><%= user.mobile || '' %> <% if(user.email){ %> · <%= user.email %><% } %></div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;">
+            <% const fields = [
+              ['ID', user.id],
+              ['Gender', user.gender],
+              ['Date of Birth', user.dob ? new Date(user.dob).toLocaleDateString('en-IN') : null],
+              ['Pronouns', user.pronouns],
+              ['Interested In', user.interested_in],
+              ['Height (cm)', user.height_cm],
+              ['Relationship Type', user.relationship_type],
+              ['Religion', user.religion],
+              ['Zodiac', user.zodiac],
+              ['Education', user.education],
+              ['Family Plan', user.family_plan],
+              ['Job', user.job],
+              ['Languages', user.languages],
+              ['Smoking', user.lifestyle_smoking],
+              ['Drinking', user.lifestyle_drinking],
+              ['Workout', user.lifestyle_workout],
+              ['Diet', user.diet],
+              ['Distance Preferred', user.distance_preferred],
+              ['OTP Verified', user.is_otp_verified ? '✅ Yes' : '❌ No'],
+              ['Joined', new Date(user.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})],
+            ]; %>
+            <% fields.forEach(([label, val]) => { %>
+              <div class="detail-item">
+                <label><%= label %></label>
+                <span><%= val || '—' %></span>
+              </div>
+            <% }); %>
+            <% if (user.about) { %>
+              <div class="detail-item" style="grid-column:1/-1;">
+                <label>About</label>
+                <span><%= user.about %></span>
+              </div>
+            <% } %>
+          </div>
         </div>
+
         <div class="card-panel table-card">
           <h3>Subscription History</h3>
-          <table>
+          <% if (!subscriptions.length) { %>
+            <p style="color:#9ca3af;font-size:0.875rem;">No subscriptions found.</p>
+          <% } else { %>
+          <table class="styled-table">
             <thead>
               <tr>
-                <th>ID</th>
+                <th>#</th>
                 <th>Plan</th>
                 <th>Duration</th>
                 <th>Price Paid</th>
@@ -75,20 +98,24 @@
               </tr>
             </thead>
             <tbody>
-              <% subscriptions.forEach((sub) => { %>
+              <% subscriptions.forEach((sub) => {
+                const sc = sub.status === 'active' ? 'status-active' : sub.status === 'expired' ? 'status-expired' : 'status-inactive';
+              %>
                 <tr>
-                  <td><%= sub.id %></td>
-                  <td><%= sub.plan_name || 'N/A' %></td>
+                  <td style="color:#9ca3af;font-size:0.8rem;"><%= sub.id %></td>
+                  <td style="font-weight:600;"><%= sub.plan_name || 'N/A' %></td>
                   <td><%= sub.duration_type || 'N/A' %></td>
-                  <td><%= sub.price_paid != null ? sub.price_paid : 'N/A' %></td>
-                  <td><%= sub.status %></td>
-                  <td><%= sub.start_date ? new Date(sub.start_date).toLocaleDateString() : '—' %></td>
-                  <td><%= sub.end_date ? new Date(sub.end_date).toLocaleDateString() : '—' %></td>
+                  <td>₹<%= sub.price_paid != null ? sub.price_paid : '—' %></td>
+                  <td><span class="status-badge <%= sc %>"><%= sub.status %></span></td>
+                  <td style="font-size:0.8rem;color:#6b7280;"><%= sub.start_date ? new Date(sub.start_date).toLocaleDateString('en-IN') : '—' %></td>
+                  <td style="font-size:0.8rem;color:#6b7280;"><%= sub.end_date ? new Date(sub.end_date).toLocaleDateString('en-IN') : '—' %></td>
                 </tr>
               <% }); %>
             </tbody>
           </table>
+          <% } %>
         </div>
+
       <% } %>
     </main>
   </div>

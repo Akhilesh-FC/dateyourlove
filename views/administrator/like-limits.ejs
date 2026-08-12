@@ -4,99 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Like Limits – DateYourLove</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/css/admin.css" />
-  <style>
-    .limits-grid {
-      display: grid;
-      gap: 1.25rem;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      margin-top: 1.5rem;
-    }
-    .limit-card {
-      background: #fff;
-      border-radius: 20px;
-      padding: 1.5rem;
-      box-shadow: 0 8px 24px rgba(15,23,42,0.07);
-      border: 1px solid rgba(232,40,63,0.08);
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    .limit-card-header {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .limit-type-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.4rem 0.9rem;
-      border-radius: 999px;
-      background: linear-gradient(135deg, #E8283F, #A80F22);
-      color: #fff;
-      font-size: 0.82rem;
-      font-weight: 700;
-      text-transform: capitalize;
-    }
-    .limit-fields {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.85rem;
-    }
-    .limit-field label {
-      display: block;
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: #64748b;
-      margin-bottom: 0.35rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .limit-field input[type="number"] {
-      width: 100%;
-      padding: 0.7rem 0.85rem;
-      border-radius: 12px;
-      border: 1.5px solid #e2e8f0;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #1f2937;
-      background: #f8fafc;
-      box-sizing: border-box;
-      transition: border-color 0.2s;
-      outline: none;
-    }
-    .limit-field input[type="number"]:focus {
-      border-color: #E8283F;
-      background: #fff;
-    }
-    .save-row {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 1.5rem;
-    }
-    .btn-primary {
-      padding: 0.85rem 2rem;
-      border-radius: 12px;
-      border: none;
-      background: linear-gradient(135deg, #E8283F, #A80F22);
-      color: #fff;
-      font-size: 0.95rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-    .btn-primary:hover { opacity: 0.88; }
-    .alert {
-      padding: 0.9rem 1.1rem;
-      border-radius: 12px;
-      margin-bottom: 1rem;
-      font-weight: 600;
-    }
-    .alert-success { background: #d1fae5; color: #065f46; }
-    .alert-danger  { background: #fee2e2; color: #991b1b; }
-  </style>
 </head>
 <body class="admin-body">
   <%- include('header') %>
@@ -107,28 +16,26 @@
       <div class="page-header">
         <div>
           <h2>Like Limits</h2>
-          <p style="margin:0;color:#64748b;font-size:0.95rem;">Manage daily like &amp; superlike limits per user segment.</p>
+          <p>Set daily like &amp; superlike limits per user segment.</p>
         </div>
       </div>
 
-      <% if (message) { %><div class="alert alert-success"><%= message %></div><% } %>
-      <% if (error)   { %><div class="alert alert-danger"><%= error %></div><% } %>
+      <% if (message) { %><div class="alert alert-success">✅ <%= message %></div><% } %>
+      <% if (error)   { %><div class="alert alert-danger">⚠️ <%= error %></div><% } %>
 
       <form method="POST" action="/admin/like-limits">
         <div class="limits-grid">
           <% limits.forEach((limit) => { %>
             <div class="limit-card">
               <input type="hidden" name="ids" value="<%= limit.id %>">
-              <div class="limit-card-header">
-                <span class="limit-type-badge">❤️ <%= limit.type %></span>
-              </div>
+              <div class="limit-type-badge">❤️ <%= limit.type %></div>
               <div class="limit-fields">
                 <div class="limit-field">
                   <label>Daily Likes</label>
                   <input type="number" name="max_daily_likes" value="<%= limit.max_daily_likes %>" min="0" />
                 </div>
                 <div class="limit-field">
-                  <label>Daily Superlikes</label>
+                  <label>Superlikes</label>
                   <input type="number" name="max_daily_superlikes" value="<%= limit.max_daily_superlikes %>" min="0" />
                 </div>
               </div>

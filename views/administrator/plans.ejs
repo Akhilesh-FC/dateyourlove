@@ -3,54 +3,176 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin Plans – DateYourLove</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <title>Plans – DateYourLove Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/css/admin.css" />
+  <style>
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1rem;
+    }
+    .plan-card {
+      background: #fff;
+      border-radius: 18px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .plan-card-head {
+      background: linear-gradient(135deg, #E8283F, #A80F22);
+      padding: 1.25rem 1.4rem;
+      color: #fff;
+    }
+    .plan-card-head h3 {
+      margin: 0 0 0.25rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .plan-card-head p {
+      margin: 0;
+      font-size: 0.8rem;
+      opacity: 0.85;
+    }
+    .plan-card-body { padding: 1.25rem 1.4rem; flex: 1; }
+
+    /* durations */
+    .durations-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.6rem;
+    }
+    .durations-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.1rem;
+    }
+    .duration-chip {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.45rem 0.85rem;
+      border-radius: 10px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      min-width: 80px;
+    }
+    .duration-chip .dur-type {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #b91c1c;
+      text-transform: capitalize;
+    }
+    .duration-chip .dur-price {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #111827;
+    }
+
+    /* features */
+    .features-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.6rem;
+    }
+    .features-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      font-size: 0.85rem;
+      color: #374151;
+    }
+    .feature-item.inactive { color: #9ca3af; text-decoration: line-through; }
+    .feat-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .feat-dot.on  { background: #22c55e; }
+    .feat-dot.off { background: #d1d5db; }
+
+    .no-features { font-size: 0.8rem; color: #9ca3af; }
+  </style>
 </head>
 <body class="admin-body">
   <%- include('header') %>
   <div class="admin-wrapper">
     <%- include('sidebar') %>
     <main class="admin-content">
+
       <div class="page-header">
         <div>
-          <h2>Subscription Plans</h2>
-          <p>View current plan activity and recent subscription records.</p>
+          <h2>Plans</h2>
+          <p>All subscription plans with durations, pricing and features.</p>
         </div>
+        <span class="badge" style="font-size:0.85rem;padding:0.45rem 1rem;">Total: <%= plans.length %></span>
       </div>
-      <div class="stats-grid">
-        <div class="stat-card">Active Plans: <strong><%= planSummary.activePlans %></strong></div>
-        <div class="stat-card">Inactive Plans: <strong><%= planSummary.inactivePlans %></strong></div>
-        <div class="stat-card">Total Plans: <strong><%= planSummary.totalPlans %></strong></div>
-      </div>
-      <div class="card-panel table-card">
-        <h3>Recent Plan Records</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>User</th>
-              <th>Status</th>
-              <th>Start</th>
-              <th>End</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% plans.forEach((plan) => { %>
-              <tr>
-                <td><%= plan.id %></td>
-                <td><%= plan.email || plan.first_name || 'N/A' %></td>
-                <td><%= plan.status %></td>
-                <td><%= plan.start_date ? new Date(plan.start_date).toLocaleDateString() : '—' %></td>
-                <td><%= plan.end_date ? new Date(plan.end_date).toLocaleDateString() : '—' %></td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
-        <% if (!plans.length) { %>
-          <p>No plan records found.</p>
-        <% } %>
-      </div>
+
+      <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+      <% if (!plans.length) { %>
+        <div class="card-panel"><p style="color:#9ca3af;text-align:center;padding:2rem 0;">No plans found.</p></div>
+      <% } else { %>
+        <div class="plans-grid">
+          <% plans.forEach(plan => { %>
+            <div class="plan-card">
+              <div class="plan-card-head">
+                <h3><%= plan.name %></h3>
+                <p><%= plan.description || 'No description' %></p>
+              </div>
+              <div class="plan-card-body">
+
+                <!-- Durations & Pricing -->
+                <div class="durations-label">Pricing</div>
+                <% if (plan.durations.length) { %>
+                  <div class="durations-row">
+                    <% plan.durations.forEach(d => { %>
+                      <div class="duration-chip">
+                        <span class="dur-type"><%= d.type %></span>
+                        <span class="dur-price">₹<%= d.price %></span>
+                      </div>
+                    <% }); %>
+                  </div>
+                <% } else { %>
+                  <p class="no-features" style="margin-bottom:1rem;">No durations set</p>
+                <% } %>
+
+                <!-- Features -->
+                <div class="features-label">Features</div>
+                <% if (plan.features.length) { %>
+                  <div class="features-list">
+                    <% plan.features.forEach(f => { %>
+                      <div class="feature-item <%= f.is_active ? '' : 'inactive' %>">
+                        <span class="feat-dot <%= f.is_active ? 'on' : 'off' %>"></span>
+                        <%= f.label || f.key || '—' %>
+                      </div>
+                    <% }); %>
+                  </div>
+                <% } else { %>
+                  <p class="no-features">No features assigned</p>
+                <% } %>
+
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+
     </main>
   </div>
 </body>

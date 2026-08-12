@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Dashboard – DateYourLove</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/css/admin.css" />
 </head>
 <body class="admin-body">
@@ -12,36 +12,44 @@
   <div class="admin-wrapper">
     <%- include('sidebar') %>
     <main class="admin-content">
+
+      <div class="page-header">
+        <div>
+          <h2>Dashboard</h2>
+          <p>Welcome back! Here's what's happening.</p>
+        </div>
+      </div>
+
       <div class="stats-grid">
         <div class="stat-card stat-card-strong">
           <div class="stat-title">Total Users</div>
           <div class="stat-value"><%= stats.users %></div>
         </div>
-        <div class="stat-card stat-card-soft">
+        <div class="stat-card">
           <div class="stat-title">Active Plans</div>
           <div class="stat-value"><%= stats.activePlans %></div>
         </div>
-        <div class="stat-card stat-card-soft">
+        <div class="stat-card">
           <div class="stat-title">Inactive Plans</div>
           <div class="stat-value"><%= stats.inactivePlans %></div>
         </div>
-        <div class="stat-card stat-card-soft">
+        <div class="stat-card">
           <div class="stat-title">Total Plans</div>
           <div class="stat-value"><%= stats.totalPlans %></div>
         </div>
-        <div class="stat-card stat-card-soft">
+        <div class="stat-card">
           <div class="stat-title">Weekly Signups</div>
-          <div class="stat-value"><%= chartData.reduce((sum, item) => sum + item.value, 0) %></div>
+          <div class="stat-value"><%= chartData.reduce((s, i) => s + i.value, 0) %></div>
         </div>
-        <div class="stat-card stat-card-soft">
+        <div class="stat-card">
           <div class="stat-title">Today's Signups</div>
           <div class="stat-value"><%= chartData.length ? chartData[chartData.length - 1].value : 0 %></div>
         </div>
-        <div class="stat-card stat-card-soft">
+        <div class="stat-card">
           <div class="stat-title">Avg / Day</div>
-          <div class="stat-value"><%= chartData.length ? Math.round(chartData.reduce((sum, item) => sum + item.value, 0) / chartData.length) : 0 %></div>
+          <div class="stat-value"><%= chartData.length ? Math.round(chartData.reduce((s,i)=>s+i.value,0)/chartData.length) : 0 %></div>
         </div>
-        <div class="stat-card stat-card-soft">
+        <div class="stat-card">
           <div class="stat-title">Admin Sessions</div>
           <div class="stat-value">1</div>
         </div>
@@ -56,46 +64,44 @@
           <canvas id="signupChart"></canvas>
         </div>
 
-        <div class="card-panel quick-actions">
-          <div class="card-panel-header">
-            <h3>Quick Actions</h3>
-          </div>
+        <div class="card-panel">
+          <div class="card-panel-header"><h3>Quick Actions</h3></div>
           <div class="action-grid">
-            <div class="action-item">Manage users faster</div>
-            <div class="action-item">View active plans</div>
-            <div class="action-item">Change password securely</div>
-            <div class="action-item">Logout when done</div>
+            <a href="/admin/users" class="action-item" style="text-decoration:none;">👥 Manage Users</a>
+            <a href="/admin/plans" class="action-item" style="text-decoration:none;">💳 View Plans</a>
+            <a href="/admin/like-limits" class="action-item" style="text-decoration:none;">❤️ Like Limits</a>
+            <a href="/admin/change-password" class="action-item" style="text-decoration:none;">🔒 Change Password</a>
           </div>
         </div>
       </div>
+
     </main>
   </div>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     const chartData = <%- JSON.stringify(chartData || []) %>;
-    const labels = chartData.map(item => item.label);
-    const values = chartData.map(item => item.value);
     const ctx = document.getElementById('signupChart');
     if (ctx) {
       new Chart(ctx, {
         type: 'line',
         data: {
-          labels,
+          labels: chartData.map(i => i.label),
           datasets: [{
             label: 'New Users',
-            data: values,
-            borderColor: '#2563eb',
-            backgroundColor: 'rgba(37, 99, 235, 0.18)',
-            tension: 0.3,
-            fill: true,
-            pointRadius: 4,
+            data: chartData.map(i => i.value),
+            borderColor: '#E8283F',
+            backgroundColor: 'rgba(232,40,63,0.08)',
+            tension: 0.4, fill: true, pointRadius: 4,
+            pointBackgroundColor: '#E8283F',
           }],
         },
         options: {
           responsive: true,
+          plugins: { legend: { display: false } },
           scales: {
-            x: { grid: { display: false } },
-            y: { beginAtZero: true, grid: { color: 'rgba(15, 23, 42, 0.08)' } },
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11 } } },
           },
         },
       });
