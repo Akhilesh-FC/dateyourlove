@@ -5,6 +5,27 @@ let io = null;
 let chatService = null;
 const onlineUsers = new Map();
 
+// Canonicalize room id formats to a single standard: room_<smallerId>_<largerId>
+function canonicalizeRoomId(roomId) {
+  if (!roomId && roomId !== 0) return null;
+  const s = String(roomId).trim();
+  if (!s) return null;
+  // If already in room_1_2 format
+  if (/^room_\d+_\d+$/.test(s)) return s;
+  // If numeric_numeric
+  if (/^\d+_\d+$/.test(s)) return `room_${s}`;
+  // Try to extract two ids from the string
+  const m = s.match(/(\d+)[^\d]+(\d+)/);
+  if (m) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    const small = Math.min(a, b);
+    const big = Math.max(a, b);
+    return `room_${small}_${big}`;
+  }
+  return s;
+}
+
 const getChatService = () => {
   if (!chatService) {
     chatService = require('../services/chatService');
@@ -40,13 +61,20 @@ function removeUserSocket(userId, socketId) {
 function addUserActiveRoom(userId, roomId) {
   const entry = getUserEntry(userId);
   if (!entry || !roomId) return;
-  entry.activeRoomIds.add(String(roomId).trim());
+  const canonical = canonicalizeRoomId(roomId);
+  if (!canonical) return;
+  entry.activeRoomIds.add(canonical);
+  // Debug: log user's active rooms for easier diagnosis
+  try { console.debug(`ADD ACTIVE ROOM: user=${userId} room=${canonical} activeRooms=${JSON.stringify(Array.from(entry.activeRoomIds))}`); } catch (e) {}
 }
 
 function removeUserActiveRoom(userId, roomId) {
   const entry = getUserEntry(userId);
   if (!entry || !roomId) return;
-  entry.activeRoomIds.delete(String(roomId).trim());
+  const canonical = canonicalizeRoomId(roomId);
+  if (!canonical) return;
+  entry.activeRoomIds.delete(canonical);
+  try { console.debug(`REMOVE ACTIVE ROOM: user=${userId} room=${canonical} activeRooms=${JSON.stringify(Array.from(entry.activeRoomIds))}`); } catch (e) {}
 }
 
 function normalizeRoomId(data) {
@@ -158,13 +186,14 @@ function initSocket(server) {
       }
 
       const normalizedRoomId = normalizeRoomId(data);
+      const canonicalRoomId = canonicalizeRoomId(normalizedRoomId);
       const previousRoomId = socket.data.activeRoomId;
       if (previousRoomId) {
         removeUserActiveRoom(senderId, previousRoomId);
       }
-      socket.data.activeRoomId = normalizedRoomId;
-      if (normalizedRoomId) {
-        addUserActiveRoom(senderId, normalizedRoomId);
+      socket.data.activeRoomId = canonicalRoomId;
+      if (canonicalRoomId) {
+        addUserActiveRoom(senderId, canonicalRoomId);
       }
 
       if (typeof callback === 'function') {
@@ -213,7 +242,8 @@ function initSocket(server) {
         }
 
         const { roomId: rawRoomId, receiverId, message, imageUrl } = data || {};
-        const roomId = rawRoomId ? String(rawRoomId).trim() : '';
+        const roomIdRaw = rawRoomId ? String(rawRoomId).trim() : '';
+        const roomId = canonicalizeRoomId(roomIdRaw) || roomIdRaw;
         if (!roomId || !receiverId || (!message && !imageUrl)) {
           return typeof callback === 'function' && callback({ success: false, error: 'roomId, receiverId, and message or imageUrl are required.' });
         }
@@ -257,7 +287,10 @@ function initSocket(server) {
           });
         }
 
-        const suppressNotification = isUserActiveInRoom(Number(receiverId), roomId);
+        // Suppress only when BOTH sender and receiver are active in the same canonical room
+        const receiverActive = isUserActiveInRoom(Number(receiverId), roomId);
+        const senderActive = isUserActiveInRoom(senderId, roomId);
+        const suppressNotification = Boolean(receiverActive && senderActive);
         io.to(`user_${receiverId}`).emit('message', {
           ...insertedMessage,
           receiverHasPlan,
