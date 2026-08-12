@@ -2,13 +2,26 @@ const db = require('../../config/db');
 
 exports.showUsers = async (req, res) => {
   try {
-    const page = Number(req.query.page) > 0 ? Number(req.query.page) : 1;
-    const limit = 10;
+    const page   = Number(req.query.page) > 0 ? Number(req.query.page) : 1;
+    const limit  = 10;
     const offset = (page - 1) * limit;
+    const search = (req.query.search || '').trim();
 
-    const [[countRows]] = await db.query('SELECT COUNT(*) AS total FROM users');
-    const totalUsers = Number(countRows.total || 0);
-    const totalPages = Math.max(1, Math.ceil(totalUsers / limit));
+    let whereClause = '';
+    let params      = [];
+
+    if (search) {
+      whereClause = `WHERE u.first_name LIKE ? OR u.mobile LIKE ? OR u.email LIKE ?`;
+      const like  = `%${search}%`;
+      params      = [like, like, like];
+    }
+
+    const [[countRows]] = await db.query(
+      `SELECT COUNT(*) AS total FROM users u ${whereClause}`,
+      params
+    );
+    const totalUsers  = Number(countRows.total || 0);
+    const totalPages  = Math.max(1, Math.ceil(totalUsers / limit));
 
     const [users] = await db.query(
       `SELECT u.*,
@@ -18,9 +31,10 @@ exports.showUsers = async (req, res) => {
        LEFT JOIN user_subscriptions us ON us.id = (
          SELECT id FROM user_subscriptions WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1
        )
+       ${whereClause}
        ORDER BY u.created_at DESC
        LIMIT ? OFFSET ?`,
-      [limit, offset]
+      [...params, limit, offset]
     );
 
     return res.render('administrator/users', {
@@ -30,16 +44,14 @@ exports.showUsers = async (req, res) => {
       page,
       totalPages,
       totalUsers,
+      search,
     });
   } catch (err) {
     console.error('ADMIN USERS ERROR:', err);
     return res.render('administrator/users', {
       admin: req.session.admin,
-      users: [],
-      error: 'Unable to load users',
-      page: 1,
-      totalPages: 1,
-      totalUsers: 0,
+      users: [], error: 'Unable to load users',
+      page: 1, totalPages: 1, totalUsers: 0, search: '',
     });
   }
 };

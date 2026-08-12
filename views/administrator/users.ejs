@@ -6,6 +6,55 @@
   <title>Admin Users – DateYourLove</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/css/admin.css" />
+  <style>
+    .search-bar {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .search-bar input {
+      flex: 1;
+      padding: 0.65rem 1rem;
+      border-radius: 10px;
+      border: 1.5px solid #e5e7eb;
+      font-size: 0.875rem;
+      color: #111827;
+      background: #f9fafb;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-bar input:focus { border-color: #E8283F; background: #fff; }
+    .search-bar button {
+      padding: 0.65rem 1.2rem;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, #E8283F, #A80F22);
+      color: #fff;
+      font-size: 0.875rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .search-clear {
+      padding: 0.65rem 1rem;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      color: #6b7280;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+    .search-clear:hover { background: #f3f4f6; }
+    .search-result-info {
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin-bottom: 0.75rem;
+    }
+    .search-result-info strong { color: #E8283F; }
+  </style>
 </head>
 <body class="admin-body">
   <%- include('header') %>
@@ -21,9 +70,32 @@
         <span class="badge" style="font-size:0.85rem;padding:0.45rem 1rem;">Total: <%= totalUsers %></span>
       </div>
 
+      <!-- Search Bar -->
+      <form class="search-bar" method="GET" action="/admin/users">
+        <input
+          type="text"
+          name="search"
+          value="<%= search || '' %>"
+          placeholder="🔍  Search by name, mobile or email..."
+          autocomplete="off"
+        />
+        <button type="submit">Search</button>
+        <% if (search) { %>
+          <a href="/admin/users" class="search-clear">✕ Clear</a>
+        <% } %>
+      </form>
+
+      <% if (search) { %>
+        <div class="search-result-info">
+          Showing <strong><%= totalUsers %></strong> result<%= totalUsers !== 1 ? 's' : '' %> for "<strong><%= search %></strong>"
+        </div>
+      <% } %>
+
       <div class="card-panel table-card">
         <% if (!users.length) { %>
-          <p style="color:#6b7280;text-align:center;padding:2rem 0;">No users found.</p>
+          <p style="color:#6b7280;text-align:center;padding:2rem 0;">
+            <%= search ? 'No users found for "' + search + '"' : 'No users found.' %>
+          </p>
         <% } else { %>
         <table class="styled-table">
           <thead>
@@ -40,11 +112,12 @@
           </thead>
           <tbody>
             <% users.forEach((user, i) => {
+              const serial = (page - 1) * 10 + i + 1;
               const initials = (user.first_name || '?')[0].toUpperCase();
               const statusClass = user.current_plan_status === 'active' ? 'status-active' : user.current_plan_status === 'expired' ? 'status-expired' : 'status-inactive';
             %>
               <tr class="user-row" data-uid="<%= user.id %>">
-                <td style="color:#9ca3af;font-size:0.8rem;"><%= user.id %></td>
+                <td style="color:#9ca3af;font-size:0.8rem;"><%= serial %></td>
                 <td>
                   <div style="display:flex;align-items:center;gap:0.65rem;">
                     <% if (user.photo_url) { %>
@@ -110,11 +183,11 @@
 
         <div class="pagination">
           <% if (page > 1) { %>
-            <a href="/admin/users?page=<%= page - 1 %>" class="pagination-link">← Prev</a>
+            <a href="/admin/users?page=<%= page - 1 %><%= search ? '&search=' + encodeURIComponent(search) : '' %>" class="pagination-link">← Prev</a>
           <% } %>
           <span class="pagination-info">Page <%= page %> of <%= totalPages %></span>
           <% if (page < totalPages) { %>
-            <a href="/admin/users?page=<%= page + 1 %>" class="pagination-link">Next →</a>
+            <a href="/admin/users?page=<%= page + 1 %><%= search ? '&search=' + encodeURIComponent(search) : '' %>" class="pagination-link">Next →</a>
           <% } %>
         </div>
         <% } %>
@@ -129,11 +202,8 @@
         const uid = btn.dataset.uid;
         const detailRow = document.getElementById('detail-' + uid);
         const isOpen = detailRow.style.display !== 'none';
-
-        // close all others
         document.querySelectorAll('.detail-row').forEach(r => r.style.display = 'none');
         document.querySelectorAll('.tbl-btn.view-toggle').forEach(b => b.classList.remove('active-view'));
-
         if (!isOpen) {
           detailRow.style.display = 'table-row';
           btn.classList.add('active-view');

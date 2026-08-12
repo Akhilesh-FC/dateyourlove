@@ -2,10 +2,10 @@ const db = require('../../config/db');
 
 exports.showPlans = async (req, res) => {
   try {
-    const [plans]       = await db.query('SELECT id, name, description, created_at FROM plans ORDER BY id ASC');
-    const [durations]   = await db.query('SELECT id, plan_id, type, price FROM plan_durations ORDER BY plan_id, id ASC');
-    const [features]    = await db.query('SELECT id, `key`, label FROM features ORDER BY id ASC');
-    const [planFeatures]= await db.query('SELECT plan_id, feature_id, is_active FROM plan_features');
+    const [plans]        = await db.query('SELECT id, name, description, created_at FROM plans ORDER BY id ASC');
+    const [durations]    = await db.query('SELECT id, plan_id, type, price FROM plan_durations ORDER BY plan_id, id ASC');
+    const [features]     = await db.query('SELECT id, `key`, label FROM features ORDER BY id ASC');
+    const [planFeatures] = await db.query('SELECT plan_id, feature_id, is_active FROM plan_features');
 
     const durationsByPlan = {};
     durations.forEach(d => {
@@ -43,18 +43,6 @@ exports.showPlans = async (req, res) => {
       admin: req.session.admin, plans: [], activePage: 'plans',
       message: null, error: 'Unable to load plans',
     });
-  }
-};
-
-// Toggle plan active/inactive
-exports.togglePlan = async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    await db.query('UPDATE plans SET is_active = NOT is_active, updated_at = NOW() WHERE id = ?', [id]);
-    return res.redirect('/admin/plans?message=' + encodeURIComponent('Plan status updated'));
-  } catch (err) {
-    console.error('TOGGLE PLAN ERROR:', err);
-    return res.redirect('/admin/plans?error=' + encodeURIComponent('Unable to update plan status'));
   }
 };
 
