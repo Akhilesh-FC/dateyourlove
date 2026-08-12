@@ -21,15 +21,19 @@ exports.processLogin = async (req, res) => {
   try {
     const admin = await adminModel.getAdminByEmail(email);
     if (admin && admin.password === password) {
-      req.session.admin = {
-        id: admin.id,
-        email: admin.email,
-        sessionId: req.sessionID,
-        lastActivity: Date.now(),
-      };
-      setActiveAdminSessionId(req.sessionID);
-      const returnTo = req.query.returnTo || '/admin/dashboard';
-      return res.redirect(returnTo);
+      req.session.regenerate((err) => {
+        if (err) return res.redirect('/admin/login?error=' + encodeURIComponent('Session error'));
+        req.session.admin = {
+          id: admin.id,
+          email: admin.email,
+          sessionId: req.sessionID,
+          lastActivity: Date.now(),
+        };
+        setActiveAdminSessionId(req.sessionID);
+        const returnTo = req.query.returnTo || '/admin/dashboard';
+        return res.redirect(returnTo);
+      });
+      return;
     }
     const errMsg = encodeURIComponent('Invalid credentials');
     return res.redirect(`/admin/login?error=${errMsg}`);
@@ -93,16 +97,14 @@ exports.processChangePassword = async (req, res) => {
   const { current_password, new_password, confirm_password } = req.body;
   if (!current_password || !new_password || !confirm_password) {
     return res.render('administrator/change-password', {
-      admin: req.session.admin,
-      error: 'All fields are required',
-      message: null,
+      admin: req.session.admin, activePage: 'change-password',
+      error: 'All fields are required', message: null,
     });
   }
   if (new_password !== confirm_password) {
     return res.render('administrator/change-password', {
-      admin: req.session.admin,
-      error: 'New password and confirmation do not match',
-      message: null,
+      admin: req.session.admin, activePage: 'change-password',
+      error: 'New password and confirmation do not match', message: null,
     });
   }
 
@@ -110,9 +112,8 @@ exports.processChangePassword = async (req, res) => {
     const admin = await adminModel.getAdminById(req.session.admin.id);
     if (!admin || admin.password !== current_password) {
       return res.render('administrator/change-password', {
-        admin: req.session.admin,
-        error: 'Current password is incorrect',
-        message: null,
+        admin: req.session.admin, activePage: 'change-password',
+        error: 'Current password is incorrect', message: null,
       });
     }
 
@@ -124,9 +125,8 @@ exports.processChangePassword = async (req, res) => {
   } catch (err) {
     console.error('Change password error:', err);
     return res.render('administrator/change-password', {
-      admin: req.session.admin,
-      error: 'Unable to update password',
-      message: null,
+      admin: req.session.admin, activePage: 'change-password',
+      error: 'Unable to update password', message: null,
     });
   }
 };
