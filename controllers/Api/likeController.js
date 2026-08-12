@@ -32,16 +32,21 @@ const emitSocketEvents = (targetUserId, event, payload) => {
 //   }
 // };
 
-const sendFcm = async (fcmToken, title, body) => {
+const sendFcm = async (fcmToken, title, body, data = {}) => {
   if (!fcmToken) {
     console.warn('⚠️ No FCM token found, skipping push notification');
     return;
   }
+
   const message = {
     token: fcmToken,
     notification: { title, body },
-    data: { click_action: 'FLUTTER_NOTIFICATION_CLICK' },
+    data: {
+      click_action: 'FLUTTER_NOTIFICATION_CLICK',
+      ...data,
+    },
   };
+
   try {
     const response = await messaging.send(message);
     console.log('✅ FCM sent successfully:', response);
@@ -209,7 +214,12 @@ exports.toggleLike = async (req, res) => {
       const bodyMessage = action === 'like'
         ? `${likerName} liked your profile.`
         : `${likerName} superliked your profile.`;
-      await sendFcm(fcmToken, title, bodyMessage);
+      await sendFcm(fcmToken, title, bodyMessage, {
+        type: action === 'like' ? 'like' : 'superlike',
+        fromUserId: String(likerId),
+        fromUserName: likerName,
+        screen: 'likes',
+      });
 
       const [mutualLikeRows] = await db.query(
         `SELECT status FROM user_likes
@@ -239,8 +249,18 @@ exports.toggleLike = async (req, res) => {
         await ensureChatRoomForUsers(likerId, likee_id);
 
         await Promise.all([
-          sendFcm(targetToken, 'New Match!', 'You have a new match.'),
-          sendFcm(myToken, 'New Match!', 'You have a new match.')
+          sendFcm(targetToken, 'New Match!', 'You have a new match.', {
+            type: 'match',
+            matchedUserId: String(likerId),
+            matchedUserName: likerName,
+            screen: 'matches',
+          }),
+          sendFcm(myToken, 'New Match!', 'You have a new match.', {
+            type: 'match',
+            matchedUserId: String(likee_id),
+            matchedUserName: String(likee_id),
+            screen: 'matches',
+          })
         ]);
       }
     }

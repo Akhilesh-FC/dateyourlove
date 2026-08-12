@@ -400,8 +400,9 @@ async function notifyUserMessage(userId, senderId, roomId, messageText) {
         },
         data: {
           type: 'message',
-          roomId,
+          roomId: String(roomId || ''),
           fromId: String(senderId),
+          screen: 'chat',
         },
       });
     }

@@ -282,17 +282,12 @@ exports.recordSwipeAction = async (req, res) => {
       const bodyMessage = action === 'like'
         ? `${likerName} liked your profile.`
         : `${likerName} superliked your profile.`;
-      if (targetToken) {
-        try {
-          await messaging.send({
-            token: targetToken,
-            notification: { title, body: bodyMessage },
-            data: { type: action, fromUserId: String(userId) }
-          });
-        } catch (err) {
-          console.error('FCM like notification error:', err.message || err);
-        }
-      }
+      await sendFcm(targetToken, title, bodyMessage, {
+        type: action === 'like' ? 'like' : 'superlike',
+        fromUserId: String(userId),
+        fromUserName: likerName,
+        screen: 'likes',
+      });
 
       const [mutual] = await db.query(
         `SELECT liker_id FROM user_likes WHERE liker_id = ? AND likee_id = ? AND status IN ('like','superlike')`,
@@ -316,22 +311,19 @@ exports.recordSwipeAction = async (req, res) => {
           io.to(`user_${targetUserId}`).emit('notification', matchPayload);
         }
 
-        const sendFcm = async (token, title, body) => {
-          if (!token) return;
-          try {
-            await messaging.send({
-              token,
-              notification: { title, body },
-              data: { type: 'match', userId: String(targetUserId) }
-            });
-          } catch (err) {
-            console.error('FCM match notification error:', err.message || err);
-          }
-        };
-
         await Promise.all([
-          sendFcm(targetToken, 'New Match!', 'You have a new match.'),
-          sendFcm(myToken, 'New Match!', 'A match has been created.')
+          sendFcm(targetToken, 'New Match!', 'You have a new match.', {
+            type: 'match',
+            matchedUserId: String(userId),
+            matchedUserName: likerName,
+            screen: 'matches',
+          }),
+          sendFcm(myToken, 'New Match!', 'A match has been created.', {
+            type: 'match',
+            matchedUserId: String(targetUserId),
+            matchedUserName: String(targetUserId),
+            screen: 'matches',
+          })
         ]);
       }
     }

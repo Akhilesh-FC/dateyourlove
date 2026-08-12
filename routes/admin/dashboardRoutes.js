@@ -27,6 +27,7 @@ router.get('/plans', auth, planAdminController.showPlans);
 router.get('/subscriptions', auth, subscriptionAdminController.showSubscriptions);
 router.get('/like-limits', auth, likeAdminController.showLikeLimits);
 router.post('/like-limits', auth, likeAdminController.saveLikeLimits);
+router.post('/like-limits/:id', auth, likeAdminController.saveSingleLimit);
 router.get('/settings', auth, settingAdminController.showSettings);
 router.post('/settings', auth, settingAdminController.saveSetting);
 router.get('/change-password', auth, adminController.showChangePassword);
