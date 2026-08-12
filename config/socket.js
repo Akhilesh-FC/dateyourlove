@@ -1,6 +1,7 @@
 ﻿const { Server } = require('socket.io');
 const db = require('../config/db');
 const { messaging } = require('./firebase');
+const { toFullUrl } = require('../utils/appHelpers');
 let io = null;
 let chatService = null;
 const onlineUsers = new Map();
@@ -410,12 +411,14 @@ async function notifyUserMessage(userId, senderId, roomId, messageText) {
     console.error('NOTIFY_USER_MESSAGE_USER_LOOKUP_ERROR:', err && err.message ? err.message : err);
   }
 
+  const fullAvatarUrl = senderUser?.avatar_url ? toFullUrl(senderUser.avatar_url) : '';
+
   const payload = {
     type: 'chat',
     fromId: String(senderId),
     fromUserId: String(senderId),
     fromUserName: senderUser?.first_name || 'Someone',
-    fromUserAvatar: senderUser?.avatar_url || '',
+    fromUserAvatar: fullAvatarUrl,
     roomId: normalizedRoomId,
     canReply,
     message: messageText ? String(messageText).slice(0, 120) : 'New message received',
@@ -443,7 +446,7 @@ async function notifyUserMessage(userId, senderId, roomId, messageText) {
           roomId: normalizedRoomId,
           fromUserId: String(senderId),
           fromUserName: senderUser?.first_name || 'Someone',
-          fromUserAvatar: senderUser?.avatar_url || '',
+          fromUserAvatar: fullAvatarUrl,
           canReply,
           screen: 'chat',
         },

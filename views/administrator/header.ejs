@@ -1,7 +1,7 @@
 <!-- views/administrator/header.ejs -->
 <header class="admin-header">
   <div class="header-start">
-    <button class="menu-btn" type="button" aria-label="Toggle menu">☰</button>
+    <button class="menu-btn" id="sidebarToggle" type="button" aria-label="Toggle menu">☰</button>
     <div class="header-brand">
       <div class="logo-icon">
         <img src="/dateyourlovelogo.png" alt="DateYourLove" class="header-logo-img" />
@@ -30,18 +30,43 @@
     </div>
   </div>
 </header>
+
+<!-- Sidebar overlay for mobile -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    const toggle = document.getElementById('profileToggle');
+    // profile dropdown
+    const toggle   = document.getElementById('profileToggle');
     const dropdown = document.getElementById('profileDropdown');
-    if (!toggle || !dropdown) return;
-    toggle.addEventListener('click', () => {
-      dropdown.classList.toggle('visible');
-    });
-    document.addEventListener('click', (evt) => {
-      if (!toggle.contains(evt.target) && !dropdown.contains(evt.target)) {
-        dropdown.classList.remove('visible');
-      }
+    if (toggle && dropdown) {
+      toggle.addEventListener('click', () => dropdown.classList.toggle('visible'));
+      document.addEventListener('click', evt => {
+        if (!toggle.contains(evt.target) && !dropdown.contains(evt.target))
+          dropdown.classList.remove('visible');
+      });
+    }
+
+    // sidebar toggle (mobile)
+    const sidebarToggle  = document.getElementById('sidebarToggle');
+    const sidebar        = document.querySelector('.admin-sidebar');
+    const overlay        = document.getElementById('sidebarOverlay');
+
+    function openSidebar()  { sidebar.classList.add('open');  overlay.classList.add('open');  }
+    function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+
+    if (sidebarToggle && sidebar) {
+      sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+      });
+    }
+    if (overlay) overlay.addEventListener('click', closeSidebar);
+
+    // close sidebar on nav link click (mobile)
+    document.querySelectorAll('.sidebar-link').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth <= 768) closeSidebar();
+      });
     });
   });
 </script>

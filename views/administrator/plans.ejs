@@ -9,10 +9,12 @@
   <style>
     .plans-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
       gap: 1.25rem;
       margin-top: 1rem;
     }
+    @media(max-width:768px){ .plans-grid { grid-template-columns: 1fr; } }
+
     .plan-card {
       background: #fff;
       border-radius: 18px;
@@ -23,90 +25,83 @@
       flex-direction: column;
     }
     .plan-card-head {
+      padding: 1.1rem 1.3rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
       background: linear-gradient(135deg, #E8283F, #A80F22);
-      padding: 1.25rem 1.4rem;
       color: #fff;
     }
-    .plan-card-head h3 {
-      margin: 0 0 0.25rem;
-      font-size: 1.1rem;
-      font-weight: 700;
+    .plan-card-head-info h3 { margin: 0 0 0.15rem; font-size: 1rem; font-weight: 700; }
+    .plan-card-head-info p  { margin: 0; font-size: 0.75rem; opacity: 0.85; }
+
+    .plan-card-body { padding: 1.1rem 1.3rem; flex: 1; display: flex; flex-direction: column; gap: 1rem; }
+
+    /* section label */
+    .sec-label {
+      font-size: 0.68rem; font-weight: 700;
+      color: #9ca3af; text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 0.5rem;
     }
-    .plan-card-head p {
-      margin: 0;
-      font-size: 0.8rem;
-      opacity: 0.85;
-    }
-    .plan-card-body { padding: 1.25rem 1.4rem; flex: 1; }
 
     /* durations */
-    .durations-label {
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: #9ca3af;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 0.6rem;
+    .durations-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .dur-chip {
+      display: inline-flex; flex-direction: column; align-items: center;
+      padding: 0.5rem 0.9rem;
+      border-radius: 12px;
+      background: #fef2f2; border: 1px solid #fecaca;
+      min-width: 88px; cursor: pointer;
+      transition: box-shadow 0.15s;
     }
-    .durations-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1.1rem;
-    }
-    .duration-chip {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 0.45rem 0.85rem;
-      border-radius: 10px;
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      min-width: 80px;
-    }
-    .duration-chip .dur-type {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: #b91c1c;
-      text-transform: capitalize;
-    }
-    .duration-chip .dur-price {
-      font-size: 1rem;
-      font-weight: 800;
-      color: #111827;
-    }
+    .dur-chip:hover { box-shadow: 0 2px 8px rgba(232,40,63,0.15); }
+    .dur-chip .dur-type { font-size: 0.7rem; font-weight: 700; color: #b91c1c; text-transform: capitalize; }
+    .dur-chip .dur-price { font-size: 1rem; font-weight: 800; color: #111827; }
+    .dur-chip .dur-hint { font-size: 0.65rem; color: #9ca3af; margin-top: 1px; }
 
     /* features */
-    .features-label {
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: #9ca3af;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 0.6rem;
+    .features-list { display: flex; flex-direction: column; gap: 0.35rem; }
+    .feat-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.5rem; padding: 0.45rem 0.6rem;
+      border-radius: 8px; background: #f9fafb;
+      border: 1px solid #f3f4f6;
     }
-    .features-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
+    .feat-name {
+      font-size: 0.82rem; color: #374151; font-weight: 500;
+      flex: 1;
     }
-    .feature-item {
-      display: flex;
-      align-items: center;
-      gap: 0.55rem;
-      font-size: 0.85rem;
-      color: #374151;
-    }
-    .feature-item.inactive { color: #9ca3af; text-decoration: line-through; }
-    .feat-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .feat-dot.on  { background: #22c55e; }
-    .feat-dot.off { background: #d1d5db; }
+    .feat-name.off { color: #9ca3af; text-decoration: line-through; }
 
-    .no-features { font-size: 0.8rem; color: #9ca3af; }
+    /* toggle switch */
+    .toggle-switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: #d1d5db; border-radius: 99px;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #fff; left: 3px; top: 3px;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .toggle-switch input:checked + .toggle-slider { background: #22c55e; }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+    /* price modal */
+    .price-modal-card { width: 340px; }
+    .price-modal-card input[type="number"] {
+      width: 100%; padding: 0.75rem 1rem;
+      border-radius: 10px; border: 1.5px solid #e5e7eb;
+      font-size: 1.1rem; font-weight: 700; color: #111827;
+      background: #f9fafb; outline: none; box-sizing: border-box;
+      margin-top: 0.75rem;
+    }
+    .price-modal-card input[type="number"]:focus { border-color: #E8283F; background: #fff; }
   </style>
 </head>
 <body class="admin-body">
@@ -118,12 +113,13 @@
       <div class="page-header">
         <div>
           <h2>Plans</h2>
-          <p>All subscription plans with durations, pricing and features.</p>
+          <p>Manage plans, pricing and features.</p>
         </div>
         <span class="badge" style="font-size:0.85rem;padding:0.45rem 1rem;">Total: <%= plans.length %></span>
       </div>
 
-      <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+      <% if (typeof message !== 'undefined' && message) { %><div class="alert alert-success">✅ <%= message %></div><% } %>
+      <% if (typeof error   !== 'undefined' && error)   { %><div class="alert alert-danger">⚠️ <%= error %></div><% } %>
 
       <% if (!plans.length) { %>
         <div class="card-panel"><p style="color:#9ca3af;text-align:center;padding:2rem 0;">No plans found.</p></div>
@@ -131,41 +127,57 @@
         <div class="plans-grid">
           <% plans.forEach(plan => { %>
             <div class="plan-card">
+
+              <!-- HEAD -->
               <div class="plan-card-head">
-                <h3><%= plan.name %></h3>
-                <p><%= plan.description || 'No description' %></p>
+                <div class="plan-card-head-info">
+                  <h3><%= plan.name %></h3>
+                  <p><%= plan.description || 'No description' %></p>
+                </div>
               </div>
+
               <div class="plan-card-body">
 
-                <!-- Durations & Pricing -->
-                <div class="durations-label">Pricing</div>
-                <% if (plan.durations.length) { %>
-                  <div class="durations-row">
-                    <% plan.durations.forEach(d => { %>
-                      <div class="duration-chip">
-                        <span class="dur-type"><%= d.type %></span>
-                        <span class="dur-price">₹<%= d.price %></span>
-                      </div>
-                    <% }); %>
-                  </div>
-                <% } else { %>
-                  <p class="no-features" style="margin-bottom:1rem;">No durations set</p>
-                <% } %>
+                <!-- PRICING -->
+                <div>
+                  <div class="sec-label">Pricing — click to edit</div>
+                  <% if (plan.durations.length) { %>
+                    <div class="durations-row">
+                      <% plan.durations.forEach(d => { %>
+                        <div class="dur-chip"
+                          onclick="openPriceModal(<%= d.id %>, '<%= d.type %>', <%= d.price %>)">
+                          <span class="dur-type"><%= d.type.replace(/_/g,' ') %></span>
+                          <span class="dur-price">₹<%= d.price %></span>
+                          <span class="dur-hint">✏️ edit</span>
+                        </div>
+                      <% }); %>
+                    </div>
+                  <% } else { %>
+                    <p style="font-size:0.8rem;color:#9ca3af;">No durations set</p>
+                  <% } %>
+                </div>
 
-                <!-- Features -->
-                <div class="features-label">Features</div>
-                <% if (plan.features.length) { %>
-                  <div class="features-list">
-                    <% plan.features.forEach(f => { %>
-                      <div class="feature-item <%= f.is_active ? '' : 'inactive' %>">
-                        <span class="feat-dot <%= f.is_active ? 'on' : 'off' %>"></span>
-                        <%= f.label || f.key || '—' %>
-                      </div>
-                    <% }); %>
-                  </div>
-                <% } else { %>
-                  <p class="no-features">No features assigned</p>
-                <% } %>
+                <!-- FEATURES -->
+                <div>
+                  <div class="sec-label">Features</div>
+                  <% if (plan.features.length) { %>
+                    <div class="features-list">
+                      <% plan.features.forEach(f => { %>
+                        <div class="feat-row">
+                          <span class="feat-name <%= f.is_active ? '' : 'off' %>"><%= f.label || f.key || '—' %></span>
+                          <form method="POST" action="/admin/plans/<%= plan.id %>/feature/<%= f.id %>/toggle" style="display:inline;">
+                            <label class="toggle-switch" title="<%= f.is_active ? 'Deactivate' : 'Activate' %>">
+                              <input type="checkbox" <%= f.is_active ? 'checked' : '' %> onchange="this.form.submit()">
+                              <span class="toggle-slider"></span>
+                            </label>
+                          </form>
+                        </div>
+                      <% }); %>
+                    </div>
+                  <% } else { %>
+                    <p style="font-size:0.8rem;color:#9ca3af;">No features assigned</p>
+                  <% } %>
+                </div>
 
               </div>
             </div>
@@ -175,5 +187,39 @@
 
     </main>
   </div>
+
+  <!-- Price Edit Modal -->
+  <div class="modal-overlay" id="priceModal">
+    <div class="modal-card price-modal-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+        <h3 style="margin:0;font-size:1rem;">Edit Price</h3>
+        <button onclick="closePriceModal()" style="border:none;background:none;font-size:1.2rem;cursor:pointer;color:#9ca3af;">✕</button>
+      </div>
+      <p id="priceModalLabel" style="margin:0 0 0.25rem;font-size:0.8rem;color:#9ca3af;text-transform:capitalize;"></p>
+      <form method="POST" id="priceForm">
+        <input type="number" name="price" id="priceInput" min="0" placeholder="Enter price in ₹" />
+        <div style="display:flex;justify-content:flex-end;gap:0.6rem;margin-top:1rem;">
+          <button type="button" onclick="closePriceModal()" class="btn-secondary">Cancel</button>
+          <button type="submit" class="btn-primary">💾 Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const priceModal = document.getElementById('priceModal');
+
+    function openPriceModal(durId, durType, currentPrice) {
+      document.getElementById('priceModalLabel').textContent = durType.replace(/_/g, ' ');
+      document.getElementById('priceInput').value = currentPrice;
+      document.getElementById('priceForm').action = '/admin/plans/duration/' + durId + '/price';
+      priceModal.style.display = 'flex';
+      document.getElementById('priceInput').focus();
+    }
+
+    function closePriceModal() { priceModal.style.display = 'none'; }
+
+    priceModal.addEventListener('click', e => { if (e.target === priceModal) closePriceModal(); });
+  </script>
 </body>
 </html>

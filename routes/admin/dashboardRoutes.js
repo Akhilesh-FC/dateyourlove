@@ -24,6 +24,8 @@ router.get('/logout', adminController.logout);
 router.get('/dashboard', auth, adminController.dashboard);
 router.get('/users', auth, userAdminController.showUsers);
 router.get('/plans', auth, planAdminController.showPlans);
+router.post('/plans/duration/:id/price', auth, planAdminController.updateDurationPrice);
+router.post('/plans/:planId/feature/:featureId/toggle', auth, planAdminController.togglePlanFeature);
 router.get('/subscriptions', auth, subscriptionAdminController.showSubscriptions);
 router.get('/like-limits', auth, likeAdminController.showLikeLimits);
 router.post('/like-limits', auth, likeAdminController.saveLikeLimits);
