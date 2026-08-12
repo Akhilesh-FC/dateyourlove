@@ -18,6 +18,17 @@ async function userHasActiveSubscription(userId) {
   return Number(rows[0]?.count || 0) > 0;
 }
 
+async function userHasReported(reporterId, reportedId) {
+  const [rows] = await db.query(
+    `SELECT 1 FROM user_reports
+     WHERE reporter_id = ?
+       AND reported_id = ?
+     LIMIT 1`,
+    [reporterId, reportedId]
+  );
+  return rows.length > 0;
+}
+
 const generateRoomId = (user1Id, user2Id) => {
   const first = Number(user1Id);
   const second = Number(user2Id);
@@ -160,6 +171,7 @@ exports.getChatRooms = async (req, res) => {
       }
       const lastVideoCall = await chatService.getLastVideoCallBetweenUsers(userId, otherUserId);
       const userIsBlocked = await isUserBlockedBetween(userId, otherUserId);
+      const userIsReported = await userHasReported(userId, otherUserId);
       rooms.push({
         roomId: row.room_id,
         otherUser,
@@ -167,6 +179,7 @@ exports.getChatRooms = async (req, res) => {
         otherUserCanReply,
         active_plan: otherUserCanReply ? 'yes' : 'no',
         useris_blocked: userIsBlocked ? 'yes' : 'no',
+        is_report: userIsReported ? 'yes' : 'no',
         isOnline: isUserOnline(otherUserId),
         createdAt: row.created_at,
         updatedAt: row.updated_at,

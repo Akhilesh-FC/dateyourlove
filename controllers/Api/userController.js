@@ -29,6 +29,35 @@ const safeParseJson = (value, fallback) => {
   }
 };
 
+const userHasActiveSubscription = async (userId) => {
+  const [rows] = await db.query(
+    `SELECT COUNT(*) AS count
+     FROM user_subscriptions
+     WHERE user_id = ?
+       AND status = 'active'
+       AND start_date <= CURDATE()
+       AND end_date >= CURDATE()`,
+    [userId]
+  );
+  return Number(rows[0]?.count || 0) > 0;
+};
+
+const userIsBlocked = async (userId) => {
+  const [rows] = await db.query(
+    'SELECT 1 FROM user_blocks WHERE blocked_id = ? LIMIT 1',
+    [userId]
+  );
+  return rows.length > 0;
+};
+
+const userIsReported = async (userId) => {
+  const [rows] = await db.query(
+    'SELECT 1 FROM user_reports WHERE reported_id = ? LIMIT 1',
+    [userId]
+  );
+  return rows.length > 0;
+};
+
 ///////////////////////////
 // Poora users row -> API response shape. Sabhi columns (purane + naye) yahan
 // se aate hain, taaki har jagah (login, register, get-profile, update-profile)
@@ -406,7 +435,16 @@ exports.getProfile = async (req, res) => {
 
     attachDistanceFields({ lat: profile.lat, lng: profile.lng }, profile);
 
-    return res.status(200).json({ user: profile });
+    const isBlocked = await userIsBlocked(userId);
+    const isReported = await userIsReported(userId);
+    const isActivePlan = await userHasActiveSubscription(userId);
+
+    return res.status(200).json({
+      user: profile,
+      is_block: Boolean(isBlocked),
+      is_report: Boolean(isReported),
+      is_activeplan: Boolean(isActivePlan),
+    });
   } catch (err) {
     console.error('GET PROFILE ERROR:', err.message);
     return res.status(500).json({ message: 'Unable to fetch profile' });

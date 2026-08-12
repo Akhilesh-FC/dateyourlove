@@ -78,7 +78,15 @@ exports.getSwipeFeed = async (req, res) => {
             SELECT 1 FROM user_likes ul
             WHERE ul.liker_id = u.id AND ul.likee_id = ?
               AND ul.status IN ('like', 'superlike')
-          ) AS likes_you
+          ) AS likes_you,
+          EXISTS(
+            SELECT 1 FROM user_blocks ub
+            WHERE ub.blocker_id = ? AND ub.blocked_id = u.id
+          ) AS is_block,
+          EXISTS(
+            SELECT 1 FROM user_reports ur
+            WHERE ur.reporter_id = ? AND ur.reported_id = u.id
+          ) AS is_report
        FROM users u
        WHERE u.id != ?
          AND u.is_otp_verified = 1
@@ -102,7 +110,21 @@ exports.getSwipeFeed = async (req, res) => {
          AND JSON_CONTAINS(u.interested_in, ?, '$')
        HAVING distance_km <= ?
        ORDER BY distance_km ASC`,
-      [me.lat, me.lng, me.lat, userId, userId, userId, userId, userId, userId, me.gender, JSON.stringify([me.gender]), radiusKm]
+      [
+        me.lat,
+        me.lng,
+        me.lat,
+        userId,
+        userId,
+        userId,
+        userId,
+        userId,
+        userId,
+        userId,
+        me.gender,
+        JSON.stringify([me.gender]),
+        radiusKm,
+      ]
     );
 
     // Photos for all users in one query (avoids N+1)
@@ -137,6 +159,8 @@ exports.getSwipeFeed = async (req, res) => {
         job: row.job || '',
         heightLabel: formatHeightLabel(row.height_cm),
         likesYou: !!row.likes_you,
+        is_block: Boolean(row.is_block),
+        is_report: Boolean(row.is_report),
         photoCount: photos.length,
         education: row.education || '',
         communicationStyle: row.communication_style || '',
