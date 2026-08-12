@@ -29,7 +29,7 @@
               <th>Name</th>
               <th>Current Plan</th>
               <th>Plan Status</th>
-              <th>Joined</th>
+              <th>Joined</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -42,10 +42,48 @@
                 <td><%= user.current_plan_name || 'None' %></td>
                 <td><%= user.current_plan_status || 'None' %></td>
                 <td><%= new Date(user.created_at).toLocaleString() %></td>
-              </tr>
+                 <td>
+                   <button type="button" class="icon-button view-btn" data-id="<%= user.id %>" data-photo="<%= user.photo_url || '' %>" data-email="<%= user.email %>" data-mobile="<%= user.mobile %>" data-name="<%= user.first_name %>" data-plan="<%= user.current_plan_name %>" data-status="<%= user.current_plan_status %>" data-joined="<%= new Date(user.created_at).toLocaleString() %>">👁️</button>
+                 </td>
+               </tr>
             <% }); %>
           </tbody>
-        </table>
+         </table>
+
+        <!-- User Detail Modal -->
+        <div class="modal-overlay" id="profileModal">
+          <div class="modal-card">
+            <h3>User Profile</h3>
+            <div id="profileContent"></div>
+            <div class="form-actions">
+              <button type="button" class="btn-primary" id="profileClose">Close</button>
+            </div>
+          </div>
+        </div>
+
+        <script>
+          const profileModal = document.getElementById('profileModal');
+          const profileContent = document.getElementById('profileContent');
+          const closeBtn = document.getElementById('profileClose');
+          document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const html = `
+                <img src="${btn.dataset.photo}" alt="User Photo" style="width:100px;height:100px;border-radius:50%;margin-bottom:1rem;"/>
+                <p><strong>ID:</strong> ${btn.dataset.id}</p>
+                <p><strong>Email:</strong> ${btn.dataset.email}</p>
+                <p><strong>Mobile:</strong> ${btn.dataset.mobile}</p>
+                <p><strong>Name:</strong> ${btn.dataset.name}</p>
+                <p><strong>Plan:</strong> ${btn.dataset.plan}</p>
+                <p><strong>Status:</strong> ${btn.dataset.status}</p>
+                <p><strong>Joined:</strong> ${btn.dataset.joined}</p>
+              `;
+              profileContent.innerHTML = html;
+              profileModal.style.display = 'flex';
+            });
+          });
+          closeBtn.addEventListener('click', () => { profileModal.style.display = 'none'; });
+          profileModal.addEventListener('click', e => { if (e.target === profileModal) profileModal.style.display = 'none'; });
+        </script>
         <% if (!users.length) { %>
           <p>No users found.</p>
         <% } else { %>

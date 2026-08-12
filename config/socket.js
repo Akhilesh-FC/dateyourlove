@@ -188,6 +188,7 @@ function initSocket(server) {
       const normalizedRoomId = normalizeRoomId(data);
       const canonicalRoomId = canonicalizeRoomId(normalizedRoomId);
       const previousRoomId = socket.data.activeRoomId;
+      console.debug && console.debug(`SET ACTIVE ROOM event from socket=${socket.id} user=${senderId} normalized=${normalizedRoomId} canonical=${canonicalRoomId} previous=${previousRoomId}`);
       if (previousRoomId) {
         removeUserActiveRoom(senderId, previousRoomId);
       }
@@ -291,6 +292,11 @@ function initSocket(server) {
         const receiverActive = isUserActiveInRoom(Number(receiverId), roomId);
         const senderActive = isUserActiveInRoom(senderId, roomId);
         const suppressNotification = Boolean(receiverActive && senderActive);
+        try {
+          const rEntry = getUserEntry(Number(receiverId));
+          const sEntry = getUserEntry(senderId);
+          console.debug && console.debug(`CHAT_MESSAGE: sender=${senderId} receiver=${receiverId} room=${roomId} receiverActive=${receiverActive} senderActive=${senderActive} receiverRooms=${rEntry?Array.from(rEntry.activeRoomIds):[]} senderRooms=${sEntry?Array.from(sEntry.activeRoomIds):[]}`);
+        } catch (e) {}
         io.to(`user_${receiverId}`).emit('message', {
           ...insertedMessage,
           receiverHasPlan,
@@ -379,6 +385,8 @@ async function notifyUserMessage(userId, senderId, roomId, messageText) {
   if (ioInstance) {
     ioInstance.to(`user_${userId}`).emit('notification', payload);
   }
+
+  console.debug && console.debug(`NOTIFY_USER_MESSAGE: sending notification to user=${userId} from=${senderId} room=${normalizedRoomId}`);
 
   try {
     const [rows] = await db.query('SELECT fcm_token FROM users WHERE id = ? LIMIT 1', [userId]);

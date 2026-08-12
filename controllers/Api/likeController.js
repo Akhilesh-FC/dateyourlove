@@ -278,11 +278,19 @@ exports.getLikedUsers = async (req, res) => {
       if (!photosByUser[p.user_id]) photosByUser[p.user_id] = [];
       photosByUser[p.user_id].push({ id: p.id, url: toFullUrl(p.url) });
     });
+    // fetch block relationships where the current user (liker) has blocked any of these users
+    const [blockedRows] = await db.query(
+      `SELECT blocked_id FROM user_blocks WHERE blocker_id = ? AND blocked_id IN (${placeholders})`,
+      [likerId, ...likeeIds]
+    );
+    const blockedSet = new Set((blockedRows || []).map(r => r.blocked_id));
     const [meRows] = await db.query('SELECT lat, lng FROM users WHERE id = ? LIMIT 1', [likerId]);
     const currentLocation = meRows[0] || null;
 
     const likedProfiles = users.map(u => {
       const profile = buildUserPayload(u);
+      // indicate whether the current user has blocked this liked user
+      profile.is_block = Boolean(blockedSet.has(u.id));
       profile.photos = photosByUser[u.id] || [];
 
       if (

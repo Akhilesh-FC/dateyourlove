@@ -470,6 +470,72 @@ td, th {
   color: #991b1b;
 }
 
+/* Premium styled table */
+.styled-table {
+  margin: 1rem 0;
+  font-size: 0.95rem;
+  border-collapse: separate;
+  border-spacing: 0 0.5rem;
+}
+.styled-table thead {
+  background: linear-gradient(135deg, #e8283f, #a80f22);
+  color: #fff;
+}
+.styled-table th, .styled-table td {
+  padding: 0.9rem 1rem;
+}
+.styled-table tbody tr {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.styled-table tbody tr:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+.styled-table tbody tr td:first-child {
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+.styled-table tbody tr td:last-child {
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+}
+
+/* Modal overlay for edit */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-card {
+  background: #fff;
+  border-radius: 1.5rem;
+  padding: 2rem;
+  width: 380px;
+  max-width: 90%;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+}
+.modal-card h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.4rem;
+}
+.modal-card .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+
 .form-card {
   background: #ffffff;
   padding: 1.5rem;
