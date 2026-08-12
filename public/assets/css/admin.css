@@ -582,6 +582,7 @@ body.admin-body {
   .header-brand-subtitle { display: none; }
   .profile-toggle span { display: none; }
   .profile-toggle { padding: 0.5rem; border-radius: 50%; }
+  .header-quote { display: none !important; }
 }
 
 /* ===== TABLE RESPONSIVE ===== */
