@@ -3,82 +3,179 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin Settings – DateYourLove</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <title>Settings – DateYourLove Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/css/admin.css" />
   <script src="https://cdn.ckeditor.com/4.21.0/standard/ckeditor.js"></script>
+  <style>
+    .content-preview {
+      max-width: 340px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+    .modal-wide {
+      width: 780px;
+      max-width: 95vw;
+      max-height: 92vh;
+      overflow-y: auto;
+    }
+    .modal-wide h3 { margin: 0 0 0.2rem; font-size: 1.1rem; }
+    .modal-sub { font-size: 0.78rem; color: #9ca3af; margin-bottom: 1.25rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
+    .type-chip {
+      display: inline-flex; padding: 0.25rem 0.7rem;
+      border-radius: 99px; font-size: 0.75rem; font-weight: 700;
+      background: #f3f4f6; color: #374151; text-transform: capitalize;
+    }
+    /* make CKEditor fit nicely */
+    .cke { border-radius: 10px !important; border: 1.5px solid #e5e7eb !important; }
+    .cke_top { border-radius: 10px 10px 0 0 !important; background: #f9fafb !important; border-bottom: 1px solid #e5e7eb !important; }
+    .cke_bottom { border-radius: 0 0 10px 10px !important; background: #f9fafb !important; }
+  </style>
 </head>
 <body class="admin-body">
   <%- include('header') %>
   <div class="admin-wrapper">
     <%- include('sidebar') %>
     <main class="admin-content">
+
       <div class="page-header">
         <div>
           <h2>Settings</h2>
-          <p>Edit privacy policy, terms, and other text content.</p>
+          <p>Manage privacy policy, terms &amp; other content.</p>
         </div>
       </div>
-      <% if (message) { %>
-        <div class="alert alert-success"><%= message %></div>
-      <% } %>
-      <% if (error) { %>
-        <div class="alert alert-danger"><%= error %></div>
-      <% } %>
+
+      <% if (message) { %><div class="alert alert-success">✅ <%= message %></div><% } %>
+      <% if (error)   { %><div class="alert alert-danger">⚠️ <%= error %></div><% } %>
+
       <div class="card-panel table-card">
-        <table>
+        <% if (!settings.length) { %>
+          <p style="color:#9ca3af;text-align:center;padding:2rem 0;">No settings found.</p>
+        <% } else { %>
+        <table class="styled-table">
           <thead>
             <tr>
               <th>Type</th>
               <th>Name</th>
-              <th>Updated</th>
-              <th>Action</th>
+              <th>Content Preview</th>
+              <th>Last Updated</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            <% settings.forEach((setting) => { %>
+            <% settings.forEach(s => { %>
               <tr>
-                <td><%= setting.type %></td>
-                <td><%= setting.name %></td>
-                <td><%= new Date(setting.updated_at).toLocaleString() %></td>
+                <td><span class="type-chip"><%= s.type %></span></td>
+                <td style="font-weight:600;color:#111827;"><%= s.name %></td>
                 <td>
-                  <button class="btn-primary" type="button" onclick="openEditor('<%= setting.type %>', '<%= setting.name.replace(/'/g, "\\'") %>', '<%= setting.content.replace(/'/g, "\\'").replace(/\n/g, '\\n') %>')">Edit</button>
+                  <div class="content-preview"><%- (s.content || '').replace(/<[^>]*>/g, ' ').trim() %></div>
+                </td>
+                <td style="font-size:0.78rem;color:#9ca3af;white-space:nowrap;">
+                  <%= s.updated_at ? new Date(s.updated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—' %>
+                </td>
+                <td>
+                  <button class="tbl-btn edit-setting-btn"
+                    data-type="<%= s.type %>"
+                    data-name="<%= s.name %>"
+                    data-content="<%= encodeURIComponent(s.content || '') %>"
+                    title="Edit">✏️</button>
                 </td>
               </tr>
             <% }); %>
           </tbody>
         </table>
+        <% } %>
       </div>
-      <div class="card-panel form-card" id="editorPanel" style="display:none;">
-        <h3>Edit Setting</h3>
-        <form method="POST" action="/admin/settings">
-          <input type="hidden" name="type" id="settingType" />
-          <label for="settingName">Name</label>
-          <input type="text" name="name" id="settingName" required />
-          <label for="settingContent">Content</label>
-          <textarea name="content" id="settingContent" rows="10"></textarea>
-          <button type="submit" class="btn-primary">Save Setting</button>
-          <button type="button" class="btn-secondary" onclick="closeEditor()">Cancel</button>
-        </form>
-      </div>
+
     </main>
   </div>
+
+  <!-- Edit Modal -->
+  <div class="modal-overlay" id="settingModal">
+    <div class="modal-card modal-wide">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:0.25rem;">
+        <h3 id="modalTitle"></h3>
+        <button id="modalClose" style="border:none;background:none;font-size:1.2rem;cursor:pointer;color:#9ca3af;line-height:1;">✕</button>
+      </div>
+      <div class="modal-sub" id="modalSub"></div>
+
+      <form method="POST" action="/admin/settings" id="settingForm">
+        <input type="hidden" name="type" id="formType" />
+        <input type="hidden" name="name" id="formName" />
+        <textarea name="content" id="formContent"></textarea>
+        <div class="modal-actions">
+          <button type="button" id="modalCancel" class="btn-secondary">Cancel</button>
+          <button type="submit" class="btn-primary" id="saveBtn">💾 Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
-    function openEditor(type, name, content) {
-      document.getElementById('settingType').value = type;
-      document.getElementById('settingName').value = name;
-      CKEDITOR.instances.settingContent.setData(content);
-      document.getElementById('editorPanel').style.display = 'block';
-      window.scrollTo(0, document.getElementById('editorPanel').offsetTop);
+    const modal    = document.getElementById('settingModal');
+    let ckEditor   = null;
+
+    function openModal(btn) {
+      const name    = btn.dataset.name;
+      const type    = btn.dataset.type;
+      const content = decodeURIComponent(btn.dataset.content);
+
+      document.getElementById('modalTitle').textContent = name;
+      document.getElementById('modalSub').textContent   = 'Type: ' + type;
+      document.getElementById('formType').value         = type;
+      document.getElementById('formName').value         = name;
+      document.getElementById('formContent').value      = content;
+
+      modal.style.display = 'flex';
+
+      // destroy previous instance if any, then init fresh
+      if (ckEditor) {
+        ckEditor.destroy(true);
+        ckEditor = null;
+      }
+
+      ckEditor = CKEDITOR.replace('formContent', {
+        height: 320,
+        removePlugins: 'elementspath',
+        resize_enabled: false,
+        toolbar: [
+          { name: 'basicstyles', items: ['Bold','Italic','Underline','Strike','-','RemoveFormat'] },
+          { name: 'paragraph',   items: ['NumberedList','BulletedList','-','Blockquote'] },
+          { name: 'links',       items: ['Link','Unlink'] },
+          { name: 'styles',      items: ['Format'] },
+          { name: 'tools',       items: ['Maximize'] },
+        ],
+      });
+
+      ckEditor.setData(content);
     }
 
-    function closeEditor() {
-      document.getElementById('editorPanel').style.display = 'none';
+    function closeModal() {
+      modal.style.display = 'none';
+      if (ckEditor) {
+        ckEditor.destroy(true);
+        ckEditor = null;
+      }
     }
 
-    window.onload = function() {
-      CKEDITOR.replace('settingContent');
-    };
+    // sync CKEditor data to textarea before submit
+    document.getElementById('settingForm').addEventListener('submit', () => {
+      if (ckEditor) {
+        document.getElementById('formContent').value = ckEditor.getData();
+      }
+    });
+
+    document.querySelectorAll('.edit-setting-btn').forEach(btn => {
+      btn.addEventListener('click', () => openModal(btn));
+    });
+
+    document.getElementById('modalClose').addEventListener('click', closeModal);
+    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
   </script>
 </body>
 </html>

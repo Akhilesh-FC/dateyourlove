@@ -375,10 +375,49 @@ async function notifyUserMessage(userId, senderId, roomId, messageText) {
 
   const ioInstance = getIo();
   const normalizedRoomId = roomId ? String(roomId).trim() : '';
+
+  let senderUser = null;
+  let canReply = 'false';
+
+  try {
+    const [senderRows] = await db.query(
+      `SELECT u.first_name, u.fcm_token,
+              (
+                SELECT url
+                FROM user_photos
+                WHERE user_id = u.id
+                ORDER BY is_required DESC, id ASC
+                LIMIT 1
+              ) AS avatar_url
+       FROM users u
+       WHERE u.id = ?
+       LIMIT 1`,
+      [senderId]
+    );
+    senderUser = senderRows[0] || null;
+
+    const [replyRows] = await db.query(
+      `SELECT COUNT(*) AS count
+       FROM user_subscriptions
+       WHERE user_id = ?
+         AND status = 'active'
+         AND start_date <= CURDATE()
+         AND end_date >= CURDATE()`,
+      [userId]
+    );
+    canReply = String(Number(replyRows[0]?.count || 0) > 0);
+  } catch (err) {
+    console.error('NOTIFY_USER_MESSAGE_USER_LOOKUP_ERROR:', err && err.message ? err.message : err);
+  }
+
   const payload = {
-    type: 'message',
+    type: 'chat',
     fromId: String(senderId),
+    fromUserId: String(senderId),
+    fromUserName: senderUser?.first_name || 'Someone',
+    fromUserAvatar: senderUser?.avatar_url || '',
     roomId: normalizedRoomId,
+    canReply,
     message: messageText ? String(messageText).slice(0, 120) : 'New message received',
   };
 
@@ -395,13 +434,17 @@ async function notifyUserMessage(userId, senderId, roomId, messageText) {
       await messaging.send({
         token,
         notification: {
-          title: 'New message',
+          title: senderUser?.first_name || 'New message',
           body: payload.message,
         },
         data: {
-          type: 'message',
-          roomId: String(roomId || ''),
-          fromId: String(senderId),
+          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+          type: 'chat',
+          roomId: normalizedRoomId,
+          fromUserId: String(senderId),
+          fromUserName: senderUser?.first_name || 'Someone',
+          fromUserAvatar: senderUser?.avatar_url || '',
+          canReply,
           screen: 'chat',
         },
       });
