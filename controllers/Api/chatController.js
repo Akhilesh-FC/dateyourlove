@@ -3,18 +3,7 @@ const { buildUserPayload } = require('../../controllers/Api/userController');
 const { toFullUrl } = require('../../utils/appHelpers');
 const { getIo, isUserOnline, isUserActiveInRoom, notifyUserMessage } = require('../../config/socket');
 const chatService = require('../../services/chatService');
-const { isUserBlockedBetween } = require('../../utils/blockHelpers');
-
-async function isUserBlockedBy(userA, userB) {
-  const [rows] = await db.query(
-    `SELECT 1 FROM user_blocks
-     WHERE blocker_id = ?
-       AND blocked_id = ?
-     LIMIT 1`,
-    [userA, userB]
-  );
-  return rows.length > 0;
-}
+const { isUserBlockedBy, isUserBlockedBetween } = require('../../utils/blockHelpers');
 
 async function userHasActiveSubscription(userId) {
   const [rows] = await db.query(
@@ -181,7 +170,7 @@ exports.getChatRooms = async (req, res) => {
         otherUser.images = [];
       }
       const lastVideoCall = await chatService.getLastVideoCallBetweenUsers(userId, otherUserId);
-      const userIsBlocked = await isUserBlockedBetween(userId, otherUserId);
+      const userIsBlocked = await isUserBlockedBy(userId, otherUserId);
       const userIsBlockedByOther = await isUserBlockedBy(otherUserId, userId);
       const userIsReported = await userHasReported(userId, otherUserId);
       rooms.push({
