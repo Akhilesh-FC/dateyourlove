@@ -4,6 +4,7 @@ const { getIo } = require('../../config/socket'); // socket.io getter
 const { toFullUrl, calculateDistanceKm, formatDistanceLabel } = require('../../utils/appHelpers');
 const { buildUserPayload } = require('../../controllers/Api/userController');
 const { ensureChatRoomForUsers } = require('../../controllers/Api/chatController');
+const { isUserBlockedBy } = require('../../utils/blockHelpers');
 
 /** Helper – emit socket.io events for notification and compatibility */
 const emitSocketEvents = (targetUserId, event, payload) => {
@@ -304,6 +305,14 @@ exports.getLikedUsers = async (req, res) => {
       [likerId, ...likeeIds]
     );
     const blockedSet = new Set((blockedRows || []).map(r => r.blocked_id));
+    
+    // fetch block relationships where the liked users have blocked the current user
+    const [blockedByRows] = await db.query(
+      `SELECT blocker_id FROM user_blocks WHERE blocker_id IN (${placeholders}) AND blocked_id = ?`,
+      [...likeeIds, likerId]
+    );
+    const blockedBySet = new Set((blockedByRows || []).map(r => r.blocker_id));
+    
     const [meRows] = await db.query('SELECT lat, lng FROM users WHERE id = ? LIMIT 1', [likerId]);
     const currentLocation = meRows[0] || null;
 
@@ -311,6 +320,8 @@ exports.getLikedUsers = async (req, res) => {
       const profile = buildUserPayload(u);
       // indicate whether the current user has blocked this liked user
       profile.is_block = Boolean(blockedSet.has(u.id));
+      // indicate whether this liked user has blocked the current user
+      profile.is_blockedbyother = Boolean(blockedBySet.has(u.id)) ? 'yes' : 'no';
       profile.photos = photosByUser[u.id] || [];
 
       if (
