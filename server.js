@@ -13,6 +13,22 @@ app.use(express.urlencoded({ extended: true }));
 app.use(session({ secret: process.env.SESSION_SECRET || 'dev-secret', resave: false, saveUninitialized: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+
+
+// Serve /uploads folder with CORS headers
+app.use(
+  '/uploads',
+  require('express').static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  })
+);
+
+
+
+
 // View engine (EJS)
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
