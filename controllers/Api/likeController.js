@@ -326,10 +326,9 @@ exports.getLikedUsers = async (req, res) => {
 
     const likedProfiles = users.map(u => {
       const profile = buildUserPayload(u);
-      // indicate whether the current user has blocked this liked user
+      // expected API contract: only the block flag relevant to this endpoint
+      profile.is_blockedbyother = Boolean(blockedBySet.has(u.id));
       profile.is_block = Boolean(blockedSet.has(u.id));
-      // indicate whether this liked user has blocked the current user
-      profile.is_blockedbyother = Boolean(blockedBySet.has(u.id)) ? 'yes' : 'no';
       profile.photos = photosByUser[u.id] || [];
 
       if (
