@@ -13,49 +13,90 @@ exports.showLogin = (req, res) => {
   const error = req.query.error;
   const message = req.query.message;
   
-  // Clear any existing session when visiting login page
-  // This ensures a fresh start for each login attempt
+  // Ensure no admin session persists when viewing login page
   if (req.session && req.session.admin) {
-    req.session.destroy((err) => {
-      res.render('admin/login', { error, message });
-    });
-  } else {
-    res.render('admin/login', { error, message });
+    delete req.session.admin;
   }
+  clearActiveAdminSessionId();
+  
+  res.render('admin/login', { error, message });
 };
 
 // Process login – validates against admins table
 exports.processLogin = async (req, res) => {
-  const { email, password } = req.body;
+  const email = (req.body.email || '').trim();
+  const password = (req.body.password || '').trim();
+  
   try {
+    // Clear any previous session data immediately
+    if (req.session) {
+      delete req.session.admin;
+      req.session.save((err) => {
+        if (err) console.error('Session save error:', err);
+      });
+    }
+    clearActiveAdminSessionId();
+    
+    // Lookup admin by email
     const admin = await adminModel.getAdminByEmail(email);
+    
+    // Validate admin exists and password matches
     if (admin && admin.password === password) {
+      // Credentials valid - regenerate session for security
       req.session.regenerate((err) => {
-        if (err) return res.redirect('/admin/login?error=' + encodeURIComponent('Session error'));
+        if (err) {
+          console.error('Session regeneration error:', err);
+          return res.redirect('/admin/login?error=' + encodeURIComponent('Session error'));
+        }
+        
+        // Set admin data in new session
         req.session.admin = {
           id: admin.id,
           email: admin.email,
           sessionId: req.sessionID,
           lastActivity: Date.now(),
         };
+        
+        // Store active session ID
         setActiveAdminSessionId(req.sessionID);
-        const returnTo = req.query.returnTo || '/admin/dashboard';
-        return res.redirect(returnTo);
+        
+        req.session.save((err) => {
+          if (err) {
+            console.error('Session save error:', err);
+            return res.redirect('/admin/login?error=' + encodeURIComponent('Session error'));
+          }
+          const returnTo = req.query.returnTo || '/admin/dashboard';
+          return res.redirect(returnTo);
+        });
       });
       return;
     }
-    // Destroy session on failed login attempt to prevent session persistence
+    
+    // Credentials invalid - completely destroy and clear session
     req.session.destroy((err) => {
+      if (err) {
+        console.error('Session destroy error:', err);
+      }
+      clearActiveAdminSessionId();
       const errMsg = encodeURIComponent('Invalid credentials');
       return res.redirect(`/admin/login?error=${errMsg}`);
     });
   } catch (err) {
     console.error('Admin login error:', err);
-    // Destroy session on error to prevent session persistence
-    req.session.destroy((err) => {
+    // Error occurred - completely destroy session
+    if (req.session) {
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('Session destroy error:', err);
+        }
+        clearActiveAdminSessionId();
+        const errMsg = encodeURIComponent('Server error');
+        return res.redirect(`/admin/login?error=${errMsg}`);
+      });
+    } else {
       const errMsg = encodeURIComponent('Server error');
       return res.redirect(`/admin/login?error=${errMsg}`);
-    });
+    }
   }
 };
 
