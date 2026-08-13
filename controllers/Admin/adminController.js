@@ -12,7 +12,16 @@ const {
 exports.showLogin = (req, res) => {
   const error = req.query.error;
   const message = req.query.message;
-  res.render('admin/login', { error, message });
+  
+  // Clear any existing session when visiting login page
+  // This ensures a fresh start for each login attempt
+  if (req.session && req.session.admin) {
+    req.session.destroy((err) => {
+      res.render('admin/login', { error, message });
+    });
+  } else {
+    res.render('admin/login', { error, message });
+  }
 };
 
 // Process login – validates against admins table
@@ -35,12 +44,18 @@ exports.processLogin = async (req, res) => {
       });
       return;
     }
-    const errMsg = encodeURIComponent('Invalid credentials');
-    return res.redirect(`/admin/login?error=${errMsg}`);
+    // Destroy session on failed login attempt to prevent session persistence
+    req.session.destroy((err) => {
+      const errMsg = encodeURIComponent('Invalid credentials');
+      return res.redirect(`/admin/login?error=${errMsg}`);
+    });
   } catch (err) {
     console.error('Admin login error:', err);
-    const errMsg = encodeURIComponent('Server error');
-    return res.redirect(`/admin/login?error=${errMsg}`);
+    // Destroy session on error to prevent session persistence
+    req.session.destroy((err) => {
+      const errMsg = encodeURIComponent('Server error');
+      return res.redirect(`/admin/login?error=${errMsg}`);
+    });
   }
 };
 
