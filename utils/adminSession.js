@@ -8,6 +8,9 @@ function setActiveAdminSessionId(sessionId) {
   activeAdminSessionId = sessionId;
 }
 
+
+
+
 function clearActiveAdminSessionId() {
   activeAdminSessionId = null;
 }
