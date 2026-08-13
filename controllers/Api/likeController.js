@@ -282,9 +282,17 @@ exports.toggleLike = async (req, res) => {
 exports.getLikedUsers = async (req, res) => {
   try {
     const likerId = req.user.id;
+    // The liked list should always be available regardless of active plan.
+    // We still return the plan flag for the client when needed, but do not block the list.
     const isPlanActive = await userHasActiveSubscription(likerId);
-    // fetch liked user ids
-    const [likeRows] = await db.query('SELECT likee_id FROM user_likes WHERE liker_id = ? AND status = ?', [likerId, "like"]);
+
+    const [likeRows] = await db.query(
+      `SELECT likee_id
+       FROM user_likes
+       WHERE liker_id = ? AND status IN ('like', 'superlike')`,
+      [likerId]
+    );
+
     const likeeIds = likeRows.map(r => r.likee_id);
     if (likeeIds.length === 0) {
       return res.status(200).json({ likedUsers: [], isPlanActive });
