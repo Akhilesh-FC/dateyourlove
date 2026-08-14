@@ -4,8 +4,15 @@ const http = require('http');
 const { initSocket } = require('./config/socket'); // socket.io initializer
 const path = require('path');
 const session = require('express-session');
+const cors = require('cors');  
 
 const app = express();
+
+// CORS — sabse pehle lagao, baaki middleware se bhi upar
+app.use(cors({
+  origin: '*',           // production me apni frontend domain daal dena, e.g. 'https://dateyourlove.com'
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+}));
 
 // Middleware
 app.use(express.json());
@@ -18,7 +25,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Serve /uploads folder with CORS headers
 app.use(
   '/uploads',
-  require('express').static(path.join(__dirname, 'uploads'), {
+  require('express').static(path.join(__dirname, 'public'), {
     setHeaders: (res) => {
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
